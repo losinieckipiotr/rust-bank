@@ -41,11 +41,11 @@ impl Database for JsonDb {
     data.clients.insert(client.card_number.clone(), client);
 
     match data_to_json_str(&data) {
-      Ok(json) => match write_json_to_file(&json) {
-        Ok(_) => Ok(()),
-        Err(_) => return get_error(JsonDatabaseError::SavingDatabaseFile)
-      },
       Err(e) => return get_error(e),
+      Ok(json) => match write_json_to_file(&json) {
+        Err(_) => return get_error(JsonDatabaseError::SavingDatabaseFile),
+        Ok(_) => Ok(()),
+      },
     }
   }
 }
