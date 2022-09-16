@@ -1,6 +1,6 @@
 use crate::CloseApp;
 use crate::menu::Cmd;
-use crate::database::*;
+use crate::database::{Database, Client};
 
 use rand::prelude::*;
 
@@ -68,4 +68,29 @@ fn generate_pin() -> String {
   }
 
   pin
+}
+
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn should_return_create_account_cmd_name() {
+    let create_account_cmd = CreateAccountCmd::new();
+    assert_eq!(create_account_cmd.name(), "Create account");
+  }
+
+  #[test]
+  fn should_exec_create_account_cmd() {
+    let create_account_cmd = CreateAccountCmd::new();
+
+    let json_db = crate::database::tests::get_mock_json_db();
+    let mut db_box: Box<dyn Database> = Box::new(json_db);
+
+    let close_app = create_account_cmd.exec(&mut db_box);
+
+    let matches = matches!(close_app, CloseApp::No);
+    assert_eq!(matches, true);
+  }
 }

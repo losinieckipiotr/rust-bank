@@ -18,6 +18,8 @@ pub struct MainMenu {
 
 impl MainMenu {
   pub fn new(db: Box<dyn Database>) -> Self {
+    println!("using db: {}", db.name());
+
     MainMenu {
       db,
       commands: vec![
@@ -32,7 +34,7 @@ impl MainMenu {
 impl Menu for MainMenu {
   fn render(&mut self) -> CloseApp {
     print_separator();
-    println!("{}:", "Main menu");
+    println!("Main menu:",);
 
     for (i, cmd) in self.commands.iter().enumerate() {
       println!("{} - {}", i, cmd.name());
