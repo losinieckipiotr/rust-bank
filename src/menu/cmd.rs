@@ -6,7 +6,7 @@ mod balance;
 pub use exit::ExitCmd;
 pub use create_account::CreateAccountCmd;
 pub use login::LoginCmd;
-pub use balance::Balance;
+pub use balance::BalanceCmd;
 
 use crate::Database;
 use crate::menu::MenuAction;

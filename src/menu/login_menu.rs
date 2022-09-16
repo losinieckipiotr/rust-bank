@@ -1,4 +1,4 @@
-use crate::menu::cmd::{ExitCmd, Balance};
+use crate::menu::cmd::{ExitCmd, BalanceCmd};
 use crate::menu::MenuData;
 
 pub struct LoginMenu;
@@ -8,7 +8,7 @@ impl LoginMenu {
     MenuData {
       header: String::from("Login menu"),
       commands: vec![
-        Box::new(Balance::new(card_number)),
+        Box::new(BalanceCmd::new(card_number)),
         Box::new(ExitCmd::new()),
       ]
     }
