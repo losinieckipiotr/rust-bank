@@ -17,7 +17,7 @@ pub struct DatabaseData {
 pub trait Database {
   fn name(&self) -> &str;
   fn save_client(&mut self, client: Client) -> Result<(), String>;
-  fn has_client(&self, card_number: &str) -> bool; // change to result ?
+  fn has_client(&self, card_number: &str) -> bool;
   fn get_client(&self, card_number: &str) -> Result<Client, String>;
   fn get_data(&self) -> DatabaseData;
 }
