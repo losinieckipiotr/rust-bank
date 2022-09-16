@@ -10,8 +10,8 @@ pub struct Client {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct DatabaseJsonData {
-  clients: HashMap<String, Client>,
+pub struct DatabaseData {
+  pub clients: HashMap<String, Client>,
 }
 
 pub trait Database {
@@ -19,6 +19,7 @@ pub trait Database {
   fn save_client(&mut self, client: Client) -> Result<(), String>;
   fn has_client(&self, card_number: &str) -> bool; // change to result ?
   fn get_client(&self, card_number: &str) -> Result<Client, String>;
+  fn get_data(&self) -> DatabaseData;
 }
 
 pub enum JsonDatabaseError {
@@ -30,7 +31,7 @@ pub enum JsonDatabaseError {
 }
 
 pub struct JsonDb {
-  data: Option<DatabaseJsonData>,
+  data: Option<DatabaseData>,
   read_json_file: Box<dyn Fn() -> std::io::Result<String>>,
   write_json_to_file: Box<dyn Fn(&str) -> Result<(), std::io::Error>>,
 }
@@ -57,10 +58,10 @@ impl JsonDb {
 
     let read_json_file = self.read_json_file.as_ref();
 
-    let data: DatabaseJsonData = match read_json_file() {
+    let data: DatabaseData = match read_json_file() {
       // failed to read data file, try create new
       Err(_) => {
-        let empty_data = DatabaseJsonData { clients: HashMap::new() };
+        let empty_data = DatabaseData { clients: HashMap::new() };
 
         let json = match json_impl::data_to_json_str(&empty_data) {
           // failed to serialize empty_data
@@ -135,6 +136,13 @@ impl Database for JsonDb {
       Some(c) => Ok(c),
     }
   }
+
+  fn get_data(&self) -> DatabaseData {
+    match &self.data {
+      None => DatabaseData { clients: HashMap::new() },
+      Some(d) => d.clone(),
+    }
+  }
 }
 
 fn get_error_str(err: JsonDatabaseError) -> String {
@@ -150,7 +158,7 @@ fn get_error_str(err: JsonDatabaseError) -> String {
 mod json_impl {
   use super::*;
 
-  pub fn data_to_json_str(data: &DatabaseJsonData) -> Result<String, JsonDatabaseError> {
+  pub fn data_to_json_str(data: &DatabaseData) -> Result<String, JsonDatabaseError> {
     use serde_json::to_string_pretty;
 
     match to_string_pretty(&data) {
@@ -159,10 +167,10 @@ mod json_impl {
     }
   }
 
-  pub fn data_from_json(json: &str) -> Result<DatabaseJsonData, JsonDatabaseError> {
+  pub fn data_from_json(json: &str) -> Result<DatabaseData, JsonDatabaseError> {
     use serde_json::from_str;
 
-    let data: DatabaseJsonData = match from_str(json) {
+    let data: DatabaseData = match from_str(json) {
       Ok(d) => d,
       Err(_) => return Err(JsonDatabaseError::Deserialization),
     };
@@ -212,6 +220,10 @@ impl Database for SqliteDb {
   fn get_client(&self, _card_number: &str) -> Result<Client, String> {
     panic!("Not implemented!");
   }
+
+  fn get_data(&self) -> DatabaseData {
+    panic!("Not implemented!");
+  }
 }
 
 #[cfg(test)]
@@ -251,7 +263,7 @@ pub mod tests {
     let mut json_db = get_mock_json_db();
 
     json_db.write_json_to_file = Box::new(move |json| {
-      let data: DatabaseJsonData = serde_json::from_str(json).unwrap();
+      let data: DatabaseData = serde_json::from_str(json).unwrap();
       let client = data.clients.get(&card_number).unwrap();
 
       assert_eq!(client.card_number, card_number);

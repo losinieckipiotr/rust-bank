@@ -78,9 +78,13 @@ mod tests {
     let create_account_cmd = CreateAccountCmd::new();
     let mut json_db = crate::database::tests::get_mock_json_db();
 
+    assert_eq!(json_db.get_data().clients.len(), 0);
+
     let menu_action = create_account_cmd.exec(&mut json_db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
+
+    assert_eq!(json_db.get_data().clients.len(), 1);
   }
 }
