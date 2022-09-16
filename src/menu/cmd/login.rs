@@ -1,6 +1,6 @@
-use crate::CloseApp;
 use crate::menu::Cmd;
 use crate::Database;
+use crate::menu::{LoginMenu, CloseApp};
 
 pub struct  LoginCmd {
 }
@@ -16,7 +16,7 @@ impl Cmd for LoginCmd {
     "Login"
   }
 
-  fn exec(&self, db: &mut Box<dyn Database>) -> CloseApp {
+  fn exec(&self, db: &mut dyn Database) -> CloseApp {
     println!("Enter login:");
 
     // TODO remove unwrap
@@ -44,6 +44,9 @@ impl Cmd for LoginCmd {
         println!("logged in on client: {:?}", client);
       }
     }
+
+    let mut login_menu = LoginMenu::new();
+    login_menu.start(db);
 
     CloseApp::No
   }

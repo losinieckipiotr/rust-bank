@@ -1,5 +1,4 @@
-use crate::CloseApp;
-use crate::menu::Cmd;
+use crate::menu::{CloseApp, Cmd};
 use crate::Database;
 
 pub struct  ExitCmd {
@@ -16,7 +15,7 @@ impl Cmd for ExitCmd {
     "Exit"
   }
 
-  fn exec(&self, _db: &mut Box<dyn Database>) -> CloseApp {
+  fn exec(&self, _db: &mut dyn Database) -> CloseApp {
     CloseApp::Yes
   }
 }

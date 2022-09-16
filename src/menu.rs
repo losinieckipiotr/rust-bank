@@ -1,40 +1,37 @@
 mod print;
-mod close_app;
 mod cmd;
+mod main_menu;
+mod login_menu;
 
-use print::print_separator;
-use cmd::*;
+pub use main_menu::MainMenu;
+pub use login_menu::LoginMenu;
+pub use cmd::Cmd;
+
 use crate::Database;
-pub use close_app::*;
+use crate::menu::print::print_separator;
 
-pub trait Menu {
-  fn render(&mut self) -> CloseApp;
+pub enum CloseApp {
+  Yes,
+  No
 }
 
-pub struct MainMenu {
-  db: Box<dyn Database>,
+pub struct MenuData {
+  header: String,
   commands: Vec<Box< dyn Cmd>>,
 }
 
-impl MainMenu {
-  pub fn new(db: Box<dyn Database>) -> Self {
-    println!("using db: {}", db.name());
-
-    MainMenu {
-      db,
-      commands: vec![
-        Box::new(CreateAccountCmd::new()),
-        Box::new(LoginCmd::new()),
-        Box::new(ExitCmd::new()),
-      ],
+impl MenuData {
+  pub fn start(&mut self, db: &mut dyn Database) {
+    loop {
+      if let CloseApp::Yes = self.render(db) {
+        break;
+      }
     }
   }
-}
 
-impl Menu for MainMenu {
-  fn render(&mut self) -> CloseApp {
+  fn render(&mut self, db: &mut dyn Database) -> CloseApp {
     print_separator();
-    println!("Main menu:",);
+    println!("{}:", self.header);
 
     for (i, cmd) in self.commands.iter().enumerate() {
       println!("{} - {}", i, cmd.name());
@@ -49,7 +46,7 @@ impl Menu for MainMenu {
     };
 
     match self.commands.get(number as usize) {
-      Some(cmd) =>  cmd.exec(&mut self.db),
+      Some(cmd) =>  cmd.exec(db),
       None => unknown_command(),
     }
   }

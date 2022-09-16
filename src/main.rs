@@ -1,10 +1,10 @@
-use clap::{Parser, ValueEnum};
-
 mod database;
 mod menu;
 
 use database::*;
-use menu::*;
+use menu::MainMenu;
+
+use clap::{Parser, ValueEnum};
 
 // Simple program to benchmark sort algorithms
 #[derive(Parser)]
@@ -23,15 +23,10 @@ enum DataBaseType {
 
 fn main() {
   let Cli { database } = Cli::parse();
+  let mut db = db_factory(database);
+  let mut main_menu = MainMenu::new();
 
-  let db = db_factory(database);
-
-  let mut menu = MainMenu::new(db);
-  loop {
-    if let CloseApp::Yes = menu.render() {
-      break;
-    }
-  }
+  main_menu.start(db.as_mut());
 }
 
 fn db_factory(database: DataBaseType) -> Box<dyn Database> {
