@@ -1,13 +1,32 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{to_string_pretty, from_str};
 
 use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Client {
+  pub card_number: String,
+  pub pin: String,
+  pub balance: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DatabaseJsonData {
+  clients: HashMap<String, Client>,
+}
 
 pub trait Database {
   fn name(&self) -> &str;
   fn save_client(&mut self, client: Client) -> Result<(), String>;
   fn has_client(&self, card_number: &str) -> bool; // change to result ?
   fn get_client(&self, card_number: &str) -> Result<Client, String>;
+}
+
+pub enum JsonDatabaseError {
+  CreateDatabaseFile,
+  Serialization,
+  Deserialization,
+  SavingDatabaseFile,
+  ClientNotFound,
 }
 
 pub struct JsonDb {
@@ -45,30 +64,23 @@ impl JsonDb {
 
   fn get_data(&self) -> Result<DatabaseJsonData, JsonDatabaseError> {
     let read_json_file = self.read_json_file;
-    let data: DatabaseJsonData = match read_json_file() {
-      Ok(str) => match from_str(&str) {
-        Ok(d) => d,
-        Err(_) => return Err(JsonDatabaseError::Deserialization),
-      },
-      Err(_) => match self.create_empty_data_file() {
-        Ok(data) => data,
-        Err(err) => return Err(err),
-      }
-    };
 
-    Ok(data)
+    match read_json_file() {
+      Err(_) => self.create_empty_data_file(),
+      Ok(str) => json_impl::data_from_json(&str),
+    }
   }
 
   fn create_empty_data_file(&self) -> Result<DatabaseJsonData, JsonDatabaseError> {
     let empty_data = DatabaseJsonData { clients: HashMap::new() };
 
-    let json = data_to_json_str(&empty_data)?;
+    let json = json_impl::data_to_json_str(&empty_data)?;
     let write_json_to_file = self.write_json_to_file;
-    if let Err(_) = write_json_to_file(&json) {
-      return Err(JsonDatabaseError::CreateDatabaseFile);
-    }
 
-    Ok(empty_data)
+    match write_json_to_file(&json) {
+      Err(_) => Err(JsonDatabaseError::CreateDatabaseFile),
+      Ok(_) => Ok(empty_data)
+    }
   }
 }
 
@@ -83,7 +95,7 @@ impl Database for JsonDb {
     data.clients.insert(client.card_number.clone(), client);
 
     let write_json_to_file = self.write_json_to_file;
-    match data_to_json_str(&data) {
+    match json_impl::data_to_json_str(&data) {
       Err(e) => return Err(get_error_str(e)),
       Ok(json) => match write_json_to_file(&json) {
         Err(_) => return Err(get_error_str(JsonDatabaseError::SavingDatabaseFile)),
@@ -125,19 +137,28 @@ fn get_error_str(err: JsonDatabaseError) -> String {
   }
 }
 
-fn data_to_json_str(data: &DatabaseJsonData) -> Result<String, JsonDatabaseError> {
-  match to_string_pretty(&data) {
-    Ok(json) => Ok(json),
-    Err(_) => return Err(JsonDatabaseError::Serialization),
-  }
-}
+mod json_impl {
+  use super::*;
 
-enum JsonDatabaseError {
-  CreateDatabaseFile,
-  Serialization,
-  Deserialization,
-  SavingDatabaseFile,
-  ClientNotFound,
+  pub fn data_to_json_str(data: &DatabaseJsonData) -> Result<String, JsonDatabaseError> {
+    use serde_json::to_string_pretty;
+
+    match to_string_pretty(&data) {
+      Ok(json) => Ok(json),
+      Err(_) => return Err(JsonDatabaseError::Serialization),
+    }
+  }
+
+  pub fn data_from_json(json: &str) -> Result<DatabaseJsonData, JsonDatabaseError> {
+    use serde_json::from_str;
+
+    let data: DatabaseJsonData = match from_str(json) {
+      Ok(d) => d,
+      Err(_) => return Err(JsonDatabaseError::Deserialization),
+    };
+
+    Ok(data)
+  }
 }
 
 mod fs_impl {
@@ -187,18 +208,6 @@ impl Database for SqliteDb {
   }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Client {
-  pub card_number: String,
-  pub pin: String,
-  pub balance: i32,
-}
-
-#[derive(Serialize, Deserialize)]
-struct DatabaseJsonData {
-  clients: HashMap<String, Client>,
-}
-
 #[cfg(test)]
 pub mod tests {
   use super::*;
@@ -243,7 +252,7 @@ pub mod tests {
       let pin = String::from("1234");
       let balance = 0;
 
-      let data: DatabaseJsonData = from_str(json).unwrap();
+      let data: DatabaseJsonData = serde_json::from_str(json).unwrap();
       let client = data.clients.get(&card_number).unwrap();
 
       assert_eq!(client.card_number, card_number);
