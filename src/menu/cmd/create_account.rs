@@ -1,4 +1,4 @@
-use crate::menu::{CloseApp, Cmd};
+use crate::menu::{MenuAction, Cmd};
 use crate::database::{Database, Client};
 
 use rand::prelude::*;
@@ -19,7 +19,7 @@ impl Cmd for CreateAccountCmd {
     "Create account"
   }
 
-  fn exec(&self, db: &mut dyn Database) -> CloseApp {
+  fn exec(&self, db: &mut dyn Database) -> MenuAction {
     let card_number = generate_card_number();
     let pin = generate_pin();
 
@@ -40,7 +40,7 @@ impl Cmd for CreateAccountCmd {
       }
     };
 
-    CloseApp::No
+    MenuAction::Render
   }
 }
 
@@ -83,12 +83,11 @@ mod tests {
   #[test]
   fn should_exec_create_account_cmd() {
     let create_account_cmd = CreateAccountCmd::new();
-    let json_db = crate::database::tests::get_mock_json_db();
-    let mut db_box: Box<dyn Database> = Box::new(json_db);
+    let mut json_db = crate::database::tests::get_mock_json_db();
 
-    let close_app = create_account_cmd.exec(db_box.as_mut());
+    let menu_action = create_account_cmd.exec(&mut json_db);
 
-    let matches = matches!(close_app, CloseApp::No);
+    let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
   }
 }

@@ -1,4 +1,3 @@
-mod print;
 mod cmd;
 mod main_menu;
 mod login_menu;
@@ -8,28 +7,34 @@ pub use login_menu::LoginMenu;
 pub use cmd::Cmd;
 
 use crate::Database;
-use crate::menu::print::print_separator;
 
-pub enum CloseApp {
-  Yes,
-  No
+pub enum MenuAction {
+  Close,
+  Render,
+  RenderLoginMenu(String),
 }
 
 pub struct MenuData {
   header: String,
-  commands: Vec<Box< dyn Cmd>>,
+  commands: Vec<Box<dyn Cmd>>,
 }
 
 impl MenuData {
   pub fn start(&mut self, db: &mut dyn Database) {
     loop {
-      if let CloseApp::Yes = self.render(db) {
-        break;
+      match self.render(db) {
+        MenuAction::Close => break,
+        MenuAction::Render => {},
+        MenuAction::RenderLoginMenu(card_number) => {
+          let mut login_menu = LoginMenu::new(card_number);
+
+          login_menu.start(db)
+        }
       }
     }
   }
 
-  fn render(&mut self, db: &mut dyn Database) -> CloseApp {
+  fn render(&mut self, db: &mut dyn Database) -> MenuAction {
     print_separator();
     println!("{}:", self.header);
 
@@ -52,9 +57,13 @@ impl MenuData {
   }
 }
 
-fn unknown_command() -> CloseApp {
+pub fn print_separator() {
+  println!("------------------------------------------");
+}
+
+fn unknown_command() -> MenuAction {
   print_separator();
   println!("|Unknown command|");
 
-  CloseApp::No
+  MenuAction::Render
 }

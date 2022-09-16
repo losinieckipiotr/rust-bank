@@ -7,9 +7,9 @@ pub use create_account::CreateAccountCmd;
 pub use login::LoginCmd;
 
 use crate::Database;
-use crate::menu::CloseApp;
+use crate::menu::MenuAction;
 
 pub trait Cmd {
   fn name(&self) -> &str;
-  fn exec(&self, db: &mut dyn Database) -> CloseApp;
+  fn exec(&self, db: &mut dyn Database) -> MenuAction;
 }

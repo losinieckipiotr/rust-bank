@@ -31,16 +31,16 @@ pub enum JsonDatabaseError {
 
 pub struct JsonDb {
   data: Option<DatabaseJsonData>,
-  read_json_file: fn() -> std::io::Result<String>,
-  write_json_to_file: fn(json: &str) -> Result<(), std::io::Error>,
+  read_json_file: Box<dyn Fn() -> std::io::Result<String>>,
+  write_json_to_file: Box<dyn Fn(&str) -> Result<(), std::io::Error>>,
 }
 
 impl JsonDb {
   pub fn new() -> Self {
     let mut db = JsonDb {
       data: None,
-      read_json_file: fs_impl::read_json_file,
-      write_json_to_file: fs_impl::write_json_to_file
+      read_json_file: Box::new(fs_impl::read_json_file),
+      write_json_to_file: Box::new(fs_impl::write_json_to_file),
     };
 
     if let Err(msg) = db.read_data() {
@@ -55,7 +55,7 @@ impl JsonDb {
       return Ok(());
     }
 
-    let read_json_file = self.read_json_file;
+    let read_json_file = self.read_json_file.as_ref();
 
     let data: DatabaseJsonData = match read_json_file() {
       // failed to read data file, try create new
@@ -68,7 +68,7 @@ impl JsonDb {
           Ok(j) => j,
         };
 
-        let write_json_to_file = self.write_json_to_file;
+        let write_json_to_file = self.write_json_to_file.as_ref();
 
         match write_json_to_file(&json) {
           // failed to save file
@@ -99,7 +99,7 @@ impl Database for JsonDb {
     let mut data_copy = self.data.as_mut().expect("initialized data").clone();
     data_copy.clients.insert(client.card_number.clone(), client);
 
-    let write_json_to_file = self.write_json_to_file;
+    let write_json_to_file = self.write_json_to_file.as_ref();
 
     match json_impl::data_to_json_str(&data_copy) {
       Err(e) => return Err(get_error_str(e)),
@@ -221,8 +221,8 @@ pub mod tests {
   pub fn get_mock_json_db() -> JsonDb {
     let mut json_db = JsonDb {
       data: None,
-      read_json_file: read_file_mock,
-      write_json_to_file: |_| { Ok(()) },
+      read_json_file: get_empty_data_mock(),
+      write_json_to_file: write_success_mock(),
     };
 
     let result = json_db.read_data();
@@ -232,12 +232,20 @@ pub mod tests {
     json_db
   }
 
+  pub fn get_mock_client() -> Client {
+    Client {
+      card_number: String::from("4000000000000000"),
+      pin: String::from("1234"),
+      balance: 0
+    }
+  }
+
   #[test]
   fn should_return_json_db_name() {
     let mut json_db = JsonDb {
       data: None,
-      read_json_file: read_file_mock,
-      write_json_to_file: |_| { Ok(()) },
+      read_json_file: get_empty_data_mock(),
+      write_json_to_file: write_success_mock(),
     };
     let result = json_db.read_data();
     let read_ok = matches!(result, Ok(()));
@@ -248,16 +256,15 @@ pub mod tests {
 
   #[test]
   fn should_save_client_to_json() {
-    let card_number = String::from("4000000000000000");
-    let pin = String::from("1234");
-    let balance = 0;
+    let client_mock = get_mock_client();
+
+    let card_number = client_mock.card_number.clone();
+    let pin = client_mock.pin.clone();
+    let balance = client_mock.balance;
 
     let mut json_db = get_mock_json_db();
-    json_db.write_json_to_file = |json| {
-      let card_number = String::from("4000000000000000");
-      let pin = String::from("1234");
-      let balance = 0;
 
+    json_db.write_json_to_file = Box::new(move |json| {
       let data: DatabaseJsonData = serde_json::from_str(json).unwrap();
       let client = data.clients.get(&card_number).unwrap();
 
@@ -266,20 +273,16 @@ pub mod tests {
       assert_eq!(client.balance, balance);
 
       Ok(())
-    };
+    });
 
-    let result = json_db.save_client(
-      Client {
-        card_number,
-        pin,
-        balance,
-      }
-    );
-
-    assert_eq!(result, Ok(()));
+    assert_eq!(json_db.save_client(client_mock), Ok(()));
   }
 
-  fn read_file_mock() -> std::io::Result<String> {
-    Ok(String::from("{\"clients\":{}}"))
+  fn get_empty_data_mock() -> Box<dyn Fn() -> std::io::Result<String>> {
+    Box::new(|| Ok(String::from("{\"clients\":{}}")))
+  }
+
+  fn write_success_mock() -> Box<dyn Fn(&str) -> Result<(), std::io::Error>> {
+    Box::new(|_| { Ok(()) })
   }
 }
