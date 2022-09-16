@@ -74,12 +74,6 @@ mod tests {
   use super::*;
 
   #[test]
-  fn should_return_create_account_cmd_name() {
-    let create_account_cmd = CreateAccountCmd::new();
-    assert_eq!(create_account_cmd.name(), "Create account");
-  }
-
-  #[test]
   fn should_exec_create_account_cmd() {
     let create_account_cmd = CreateAccountCmd::new();
     let mut json_db = crate::database::tests::get_mock_json_db();

@@ -64,12 +64,6 @@ mod tests {
   use super::*;
 
   #[test]
-  fn should_return_login_cmd_name() {
-    let create_account_cmd = LoginCmd::new();
-    assert_eq!(create_account_cmd.name(), "Login");
-  }
-
-  #[test]
   fn should_exec_login_and_return_render_login_action() {
     let mut json_db = crate::database::tests::get_mock_json_db();
     let mock_client = crate::database::tests::get_mock_client();

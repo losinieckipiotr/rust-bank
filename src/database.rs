@@ -241,20 +241,6 @@ pub mod tests {
   }
 
   #[test]
-  fn should_return_json_db_name() {
-    let mut json_db = JsonDb {
-      data: None,
-      read_json_file: get_empty_data_mock(),
-      write_json_to_file: write_success_mock(),
-    };
-    let result = json_db.read_data();
-    let read_ok = matches!(result, Ok(()));
-
-    assert_eq!(read_ok, true);
-    assert_eq!("json", json_db.name());
-  }
-
-  #[test]
   fn should_save_client_to_json() {
     let client_mock = get_mock_client();
 
