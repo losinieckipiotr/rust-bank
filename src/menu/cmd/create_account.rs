@@ -5,8 +5,7 @@ use rand::prelude::*;
 
 const DIGITS:  &str = "0123456789";
 
-pub struct  CreateAccountCmd {
-}
+pub struct  CreateAccountCmd;
 
 impl CreateAccountCmd {
   pub fn new() -> Self {

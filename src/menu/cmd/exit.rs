@@ -1,8 +1,7 @@
 use crate::menu::{MenuAction, Cmd};
 use crate::Database;
 
-pub struct  ExitCmd {
-}
+pub struct  ExitCmd;
 
 impl ExitCmd {
   pub fn new() -> Self {
