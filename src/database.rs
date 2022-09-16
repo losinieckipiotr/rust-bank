@@ -125,9 +125,6 @@ mod fs_impl {
       .create(true)
       .open(FILE_NAME)?;
 
-    println!("Saving data:");
-    println!("{}", json);
-
     file.write_all(json.as_bytes())?;
 
     Ok(())
