@@ -9,7 +9,7 @@ pub struct Client {
   pub balance: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DatabaseJsonData {
   clients: HashMap<String, Client>,
 }
@@ -51,36 +51,41 @@ impl JsonDb {
   }
 
   fn read_data(&mut self) -> Result<(), String> {
-    if let None = self.data {
-      let data = match self.get_data() {
-        Ok(data) => data,
-        Err(e) => return Err(get_error_str(e)),
-      };
-      self.data = Some(data);
+    if let Some(_) = self.data {
+      return Ok(());
     }
 
-    Ok(())
-  }
-
-  fn get_data(&self) -> Result<DatabaseJsonData, JsonDatabaseError> {
     let read_json_file = self.read_json_file;
 
-    match read_json_file() {
-      Err(_) => self.create_empty_data_file(),
-      Ok(str) => json_impl::data_from_json(&str),
-    }
-  }
+    let data: DatabaseJsonData = match read_json_file() {
+      // failed to read data file, try create new
+      Err(_) => {
+        let empty_data = DatabaseJsonData { clients: HashMap::new() };
 
-  fn create_empty_data_file(&self) -> Result<DatabaseJsonData, JsonDatabaseError> {
-    let empty_data = DatabaseJsonData { clients: HashMap::new() };
+        let json = match json_impl::data_to_json_str(&empty_data) {
+          // failed to serialize empty_data
+          Err(e) => return Err(get_error_str(e)),
+          Ok(j) => j,
+        };
 
-    let json = json_impl::data_to_json_str(&empty_data)?;
-    let write_json_to_file = self.write_json_to_file;
+        let write_json_to_file = self.write_json_to_file;
 
-    match write_json_to_file(&json) {
-      Err(_) => Err(JsonDatabaseError::CreateDatabaseFile),
-      Ok(_) => Ok(empty_data)
-    }
+        match write_json_to_file(&json) {
+          // failed to save file
+          Err(_) => return Err(get_error_str(JsonDatabaseError::CreateDatabaseFile)),
+          Ok(_) => empty_data
+        }
+      },
+      Ok(str) => match json_impl::data_from_json(&str) {
+        Ok(d) => d,
+        Err(e) => return Err(get_error_str(e)),
+      },
+    };
+
+    // save in struct
+    self.data = Some(data);
+
+    Ok(())
   }
 }
 
@@ -90,16 +95,21 @@ impl Database for JsonDb {
   }
 
   fn save_client(&mut self, client: Client) -> Result<(), String> {
-    let data = self.data.as_mut().expect("initialized data");
-
-    data.clients.insert(client.card_number.clone(), client);
+    // make copy to rollback changes in case of error
+    let mut data_copy = self.data.as_mut().expect("initialized data").clone();
+    data_copy.clients.insert(client.card_number.clone(), client);
 
     let write_json_to_file = self.write_json_to_file;
-    match json_impl::data_to_json_str(&data) {
+
+    match json_impl::data_to_json_str(&data_copy) {
       Err(e) => return Err(get_error_str(e)),
       Ok(json) => match write_json_to_file(&json) {
         Err(_) => return Err(get_error_str(JsonDatabaseError::SavingDatabaseFile)),
-        Ok(_) => Ok(()),
+        Ok(_) => {
+          // sync data in struct
+          self.data = Some(data_copy);
+          Ok(())
+        },
       },
     }
   }
@@ -190,10 +200,6 @@ impl Database for SqliteDb {
   fn name(&self) -> &str {
     "sqlite"
   }
-
-  // fn read_data(&mut self) -> Result<(), String> {
-  //   panic!("Not implemented!");
-  // }
 
   fn save_client(&mut self, _client: Client) -> Result<(), String> {
     panic!("Not implemented!");
