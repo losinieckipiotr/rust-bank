@@ -14,12 +14,12 @@ pub enum MenuAction {
   RenderLoginMenu(String),
 }
 
-pub struct MenuData {
+pub struct Menu {
   header: String,
   commands: Vec<Box<dyn Cmd>>,
 }
 
-impl MenuData {
+impl Menu {
   pub fn start(&mut self, db: &mut dyn Database) {
     loop {
       match self.render(db) {
