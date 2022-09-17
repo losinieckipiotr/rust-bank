@@ -1,15 +1,15 @@
 use crate::menu::{MenuAction, Cmd};
 use crate::database::{Database, Client};
 
-use rand::prelude::*;
+use rand::prelude::{thread_rng, IteratorRandom};
 
-const DIGITS:  &str = "0123456789";
+const DIGITS: &str = "0123456789";
 
 pub struct  CreateAccountCmd;
 
 impl CreateAccountCmd {
   pub fn new() -> Self {
-    CreateAccountCmd {}
+    CreateAccountCmd
   }
 }
 
@@ -34,8 +34,8 @@ impl Cmd for CreateAccountCmd {
         println!("cardNumber: {}", card_number);
         println!("pin: {}", pin);
       },
-      Err(error_message) => {
-        println!("Creating client account failed: {}", error_message);
+      Err(error) => {
+        println!("Creating client account failed: {:?}", error);
       }
     };
 

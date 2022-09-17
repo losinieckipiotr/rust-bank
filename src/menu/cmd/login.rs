@@ -42,6 +42,7 @@ impl Cmd for LoginCmd {
         return  MenuAction::RenderLoginMenu(client.card_number);
       }
     }
+    // TODO handle error
 
     MenuAction::Render
   }

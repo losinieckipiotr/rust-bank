@@ -1,90 +1,104 @@
 use serde::{Deserialize, Serialize};
+use error_stack::{Context, IntoReport, Report, Result, ResultExt};
 
 use std::collections::HashMap;
+use std::fmt;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Client {
   pub card_number: String,
   pub pin: String,
   pub balance: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DatabaseData {
   pub clients: HashMap<String, Client>,
 }
 
-pub trait Database {
-  fn name(&self) -> &str;
-  fn save_client(&mut self, client: Client) -> Result<(), String>;
-  fn has_client(&self, card_number: &str) -> bool;
-  fn get_client(&self, card_number: &str) -> Result<Client, String>;
-  fn get_data(&self) -> DatabaseData;
+impl DatabaseData {
+  pub fn new() -> Self {
+    DatabaseData { clients: HashMap::new() }
+  }
 }
 
+#[derive(Debug)]
 pub enum JsonDatabaseError {
-  CreateDatabaseFile,
   Serialization,
   Deserialization,
   SavingDatabaseFile,
+  ReadingDatabaseFile,
   ClientNotFound,
 }
 
+impl fmt::Display for JsonDatabaseError {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match *self {
+      JsonDatabaseError::Serialization => write!(f, "conversion data to json string failed"),
+      JsonDatabaseError::Deserialization => write!(f, "json string conversion to data failed"),
+      JsonDatabaseError::ReadingDatabaseFile => write!(f, "reading database file failed"),
+      JsonDatabaseError::SavingDatabaseFile => write!(f, "saving database file failed"),
+      JsonDatabaseError::ClientNotFound => write!(f, "client not found in database"),
+    }
+  }
+}
+
+impl Context for JsonDatabaseError {}
+
+type JsonDataBaseResult<T> = Result<T, JsonDatabaseError>;
+
+pub trait Database {
+  fn name(&self) -> &str;
+  fn save_client(&mut self, client: Client) -> JsonDataBaseResult<()>;
+  fn has_client(&self, card_number: &str) -> bool;
+  fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client>;
+  fn get_data(&self) -> DatabaseData;
+}
+
 pub struct JsonDb {
-  data: Option<DatabaseData>,
-  read_json_file: Box<dyn Fn() -> std::io::Result<String>>,
-  write_json_to_file: Box<dyn Fn(&str) -> Result<(), std::io::Error>>,
+  data: DatabaseData,
+  read_json_file: Box<dyn Fn() -> JsonDataBaseResult<String>>,
+  write_json_to_file: Box<dyn Fn(&str) -> JsonDataBaseResult<()>>,
 }
 
 impl JsonDb {
   pub fn new() -> Self {
     let mut db = JsonDb {
-      data: None,
+      data: DatabaseData::new(),
       read_json_file: Box::new(fs_impl::read_json_file),
       write_json_to_file: Box::new(fs_impl::write_json_to_file),
     };
 
-    if let Err(msg) = db.read_data() {
-      panic!("Error reading json database: {}", msg);
+    if let Err(error) = db.read_data() {
+      panic!("Failed to read database: {}", error);
     }
 
     db
   }
 
-  fn read_data(&mut self) -> Result<(), String> {
-    if let Some(_) = self.data {
-      return Ok(());
-    }
-
+  fn read_data(&mut self) -> JsonDataBaseResult<()> {
     let read_json_file = self.read_json_file.as_ref();
 
-    let data: DatabaseData = match read_json_file() {
-      // failed to read data file, try create new
-      Err(_) => {
-        let empty_data = DatabaseData { clients: HashMap::new() };
+    match read_json_file() {
+      Err(e) => {
+        println!("failed to read data file, try create new, error: {:?}", e);
 
-        let json = match json_impl::data_to_json_str(&empty_data) {
-          // failed to serialize empty_data
-          Err(e) => return Err(get_error_str(e)),
-          Ok(j) => j,
-        };
+        // self.data must be empty
+        assert_eq!(self.data,  DatabaseData::new());
+
+        let json = json_impl::data_to_json_str(&self.data)?;
 
         let write_json_to_file = self.write_json_to_file.as_ref();
 
-        match write_json_to_file(&json) {
-          // failed to save file
-          Err(_) => return Err(get_error_str(JsonDatabaseError::CreateDatabaseFile)),
-          Ok(_) => empty_data
-        }
+        write_json_to_file(&json)
+          .attach_printable("creating database file failed")?;
       },
-      Ok(str) => match json_impl::data_from_json(&str) {
-        Ok(d) => d,
-        Err(e) => return Err(get_error_str(e)),
-      },
+      Ok(str) => {
+        let red_data = json_impl::data_from_json(&str)?;
+        // sync data
+        self.data = red_data;
+      }
     };
-
-    // save in struct
-    self.data = Some(data);
 
     Ok(())
   }
@@ -95,108 +109,93 @@ impl Database for JsonDb {
     "json"
   }
 
-  fn save_client(&mut self, client: Client) -> Result<(), String> {
+  fn save_client(&mut self, client: Client) -> JsonDataBaseResult<()> {
     // make copy to rollback changes in case of error
-    let mut data_copy = self.data.as_mut().expect("initialized data").clone();
-    data_copy.clients.insert(client.card_number.clone(), client);
+    let mut data_copy = self.data.clone();
+    data_copy.clients.insert(client.card_number.clone(), client.clone());
 
     let write_json_to_file = self.write_json_to_file.as_ref();
 
-    match json_impl::data_to_json_str(&data_copy) {
-      Err(e) => return Err(get_error_str(e)),
-      Ok(json) => match write_json_to_file(&json) {
-        Err(_) => return Err(get_error_str(JsonDatabaseError::SavingDatabaseFile)),
-        Ok(_) => {
-          // sync data in struct
-          self.data = Some(data_copy);
-          Ok(())
-        },
-      },
-    }
+    let json = json_impl::data_to_json_str(&data_copy)?;
+
+    write_json_to_file(&json).or_else(|e| {
+      Err(e.attach_printable(format!("failed to save client: {:?}", client)))
+    })?;
+
+    // sync data in struct
+    self.data = data_copy;
+
+    Ok(())
   }
 
   fn has_client(&self, card_number: &str) -> bool {
-    match &self.data {
-      None => false,
-      Some(data) => data.clients.contains_key(card_number),
-    }
+    self.data.clients.contains_key(card_number)
   }
 
-  fn get_client(&self, card_number: &str) -> Result<Client, String> {
-     let client = match &self.data {
-      None => None,
-      Some(data) => match data.clients.get(card_number) {
-        None => None,
-        Some(client) => Some(client.clone()),
-      },
-    };
-
-    match client {
-      None => Err(get_error_str(JsonDatabaseError::ClientNotFound)),
-      Some(c) => Ok(c),
+  fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client> {
+    match self.data.clients.get(card_number) {
+      None => Err(Report::new(JsonDatabaseError::ClientNotFound)),
+      Some(client) => Ok(client.clone()),
     }
   }
 
   fn get_data(&self) -> DatabaseData {
-    match &self.data {
-      None => DatabaseData { clients: HashMap::new() },
-      Some(d) => d.clone(),
-    }
-  }
-}
-
-fn get_error_str(err: JsonDatabaseError) -> String {
-   match err {
-    JsonDatabaseError::CreateDatabaseFile => String::from("creating database file failed"),
-    JsonDatabaseError::Serialization => String::from("conversion data to json string failed"),
-    JsonDatabaseError::Deserialization => String::from("json string conversion to data failed"),
-    JsonDatabaseError::SavingDatabaseFile => String::from("saving database file failed"),
-    JsonDatabaseError::ClientNotFound => String::from("client not found in database"),
+    self.data.clone()
   }
 }
 
 mod json_impl {
   use super::*;
 
-  pub fn data_to_json_str(data: &DatabaseData) -> Result<String, JsonDatabaseError> {
+  pub fn data_to_json_str(data: &DatabaseData) -> JsonDataBaseResult<String> {
     use serde_json::to_string_pretty;
 
-    match to_string_pretty(&data) {
-      Ok(json) => Ok(json),
-      Err(_) => return Err(JsonDatabaseError::Serialization),
-    }
+    to_string_pretty(&data)
+    .report()
+    .attach_printable(format!("failed to convert data to json, data: {data:?}"))
+    .change_context(JsonDatabaseError::Serialization)
   }
 
-  pub fn data_from_json(json: &str) -> Result<DatabaseData, JsonDatabaseError> {
+  pub fn data_from_json(json: &str) -> JsonDataBaseResult<DatabaseData> {
     use serde_json::from_str;
 
-    let data: DatabaseData = match from_str(json) {
-      Ok(d) => d,
-      Err(_) => return Err(JsonDatabaseError::Deserialization),
-    };
-
-    Ok(data)
+    from_str(json).or_else(|err| {
+      Err(err)
+      .report()
+      .attach_printable(format!("failed to convert json to data, data: {json:?}"))
+      .change_context(JsonDatabaseError::Deserialization)
+    })
   }
 }
 
 mod fs_impl {
+  use super::*;
   use std::fs::OpenOptions;
   use std::io::prelude::*;
 
   const FILE_NAME: &str = "data.json";
 
-  pub fn read_json_file() -> std::io::Result<String> {
+  pub fn read_json_file() -> JsonDataBaseResult<String> {
     std::fs::read_to_string(FILE_NAME)
+    .report()
+    .attach_printable(format!("failed to read file {}, file not exists?", FILE_NAME))
+    .change_context(JsonDatabaseError::ReadingDatabaseFile)
   }
 
-  pub fn write_json_to_file(json: &str) -> Result<(), std::io::Error> {
+  pub fn write_json_to_file(json: &str) -> JsonDataBaseResult<()> {
     let mut file = OpenOptions::new()
       .read(true)
       .write(true)
       .create(true)
-      .open(FILE_NAME)?;
+      .open(FILE_NAME)
+      .report()
+      .attach_printable(format!("failed to open file: {}", FILE_NAME))
+      .change_context(JsonDatabaseError::SavingDatabaseFile)?;
 
-    file.write_all(json.as_bytes())?;
+    file.write_all(json.as_bytes())
+    .report()
+    .attach_printable(format!("failed write to file: {}", FILE_NAME))
+    .change_context(JsonDatabaseError::SavingDatabaseFile)?;
 
     Ok(())
   }
@@ -209,7 +208,7 @@ impl Database for SqliteDb {
     "sqlite"
   }
 
-  fn save_client(&mut self, _client: Client) -> Result<(), String> {
+  fn save_client(&mut self, _client: Client) -> JsonDataBaseResult<()> {
     panic!("Not implemented!");
   }
 
@@ -217,7 +216,7 @@ impl Database for SqliteDb {
     panic!("Not implemented!");
   }
 
-  fn get_client(&self, _card_number: &str) -> Result<Client, String> {
+  fn get_client(&self, _card_number: &str) -> JsonDataBaseResult<Client> {
     panic!("Not implemented!");
   }
 
@@ -232,7 +231,7 @@ pub mod tests {
 
   pub fn get_mock_json_db() -> JsonDb {
     let mut json_db = JsonDb {
-      data: None,
+      data: DatabaseData::new(),
       read_json_file: get_empty_data_mock(),
       write_json_to_file: write_success_mock(),
     };
@@ -273,14 +272,19 @@ pub mod tests {
       Ok(())
     });
 
-    assert_eq!(json_db.save_client(client_mock), Ok(()));
+    json_db.save_client(client_mock).expect("client saved");
   }
 
-  fn get_empty_data_mock() -> Box<dyn Fn() -> std::io::Result<String>> {
+  fn get_empty_data_mock() -> Box<dyn Fn() -> JsonDataBaseResult<String>> {
     Box::new(|| Ok(String::from("{\"clients\":{}}")))
   }
 
-  fn write_success_mock() -> Box<dyn Fn(&str) -> Result<(), std::io::Error>> {
-    Box::new(|_| { Ok(()) })
+  fn write_success_mock() -> Box<dyn Fn(&str) -> JsonDataBaseResult<()>> {
+    Box::new(|_| {
+      // Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permissions error test"))
+      // .report()
+      // .change_context(JsonDatabaseError::SavingDatabaseFile)
+      Ok(())
+    })
   }
 }
