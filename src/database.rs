@@ -70,7 +70,8 @@ impl JsonDb {
     };
 
     if let Err(error) = db.read_data() {
-      panic!("Failed to read database: {}", error);
+      println!("error: {:?}", error);
+      panic!("Failed to read database");
     }
 
     db
@@ -81,7 +82,7 @@ impl JsonDb {
 
     match read_json_file() {
       Err(e) => {
-        println!("failed to read data file, try create new, error: {:?}", e);
+        println!("try to create new database file because: {:?}", e);
 
         // self.data must be empty
         assert_eq!(self.data,  DatabaseData::new());
@@ -91,7 +92,7 @@ impl JsonDb {
         let write_json_to_file = self.write_json_to_file.as_ref();
 
         write_json_to_file(&json)
-          .attach_printable("creating database file failed")?;
+          .attach_printable("creating new database file failed")?;
       },
       Ok(str) => {
         let red_data = json_impl::data_from_json(&str)?;
@@ -152,7 +153,7 @@ mod json_impl {
 
     to_string_pretty(&data)
     .report()
-    .attach_printable(format!("failed to convert data to json, data: {data:?}"))
+    .attach_printable(format!("data: {data:?}"))
     .change_context(JsonDatabaseError::Serialization)
   }
 
@@ -162,7 +163,11 @@ mod json_impl {
     from_str(json).or_else(|err| {
       Err(err)
       .report()
-      .attach_printable(format!("failed to convert json to data, data: {json:?}"))
+      .attach_printable_lazy(|| {
+        let mut s = String::from("json:\n");
+        s.push_str(json);
+        s
+      })
       .change_context(JsonDatabaseError::Deserialization)
     })
   }
