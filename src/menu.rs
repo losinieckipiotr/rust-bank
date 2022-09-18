@@ -9,6 +9,7 @@ pub use cmd::Cmd;
 use crate::Database;
 
 pub enum MenuAction {
+  Exit,
   Close,
   Render,
   RenderLoginMenu(String),
@@ -20,15 +21,20 @@ pub struct Menu {
 }
 
 impl Menu {
-  pub fn start(&mut self, db: &mut dyn Database) {
+  pub fn start(&mut self, db: &mut dyn Database) -> bool {
     loop {
       match self.render(db) {
-        MenuAction::Close => break,
+        MenuAction::Exit => return true,
+        MenuAction::Close => return false,
         MenuAction::Render => {},
         MenuAction::RenderLoginMenu(card_number) => {
           let mut login_menu = LoginMenu::new(card_number);
 
-          login_menu.start(db)
+          let exit = login_menu.start(db);
+
+          if exit {
+            return  true;
+          }
         }
       }
     }

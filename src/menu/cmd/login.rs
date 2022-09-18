@@ -2,8 +2,25 @@ use crate::menu::Cmd;
 use crate::Database;
 use crate::menu::MenuAction;
 
+use error_stack::{Context, IntoReport, Report, Result, ResultExt};
+
+use std::fmt;
+
+#[derive(Debug)]
+pub struct LoginError;
+
+type LoginResult<T> = Result<T, LoginError>;
+
+impl fmt::Display for LoginError {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "conversion data to json string failed")
+  }
+}
+
+impl Context for LoginError {}
+
 pub struct  LoginCmd {
-  read_from_cmd: Box<dyn Fn(&str) -> Result<String, ()>>,
+  read_from_cmd: Box<dyn Fn(&str) -> LoginResult<String>>,
 }
 
 impl LoginCmd {
@@ -22,38 +39,71 @@ impl Cmd for LoginCmd {
   fn exec(&self, db: &mut dyn Database) -> MenuAction {
     let read_from_cmd = self.read_from_cmd.as_ref();
 
-    // TODO remove unwrap ?
-    let login = read_from_cmd("Enter login:").unwrap();
-    let pin = read_from_cmd("Enter PIN:").unwrap();
+    let login = match read_from_cmd("Enter login:") {
+      Err(error) => {
+        print_error(error);
 
-    if!db.has_client(&login) {
+        return MenuAction::Render;
+      },
+      Ok(login) => login,
+    };
+
+    let pin = match read_from_cmd("Enter PIN:") {
+      Err(error) => {
+        print_error(error);
+        return MenuAction::Render;
+      },
+      Ok(pin) => pin,
+    };
+
+    if !db.has_client(&login) {
       println!("Invalid login or PIN");
+
+      return MenuAction::Render;
     }
 
-    let client_option = db.get_client(&login);
+    let client = match db.get_client(&login) {
+      Err(error) => {
+        print_error(
+          error
+          .attach_printable("failed to ged client from database")
+          .change_context(LoginError)
+        );
 
-    if let Ok(client) = client_option {
-      if client.pin != pin {
-        println!("Invalid login or PIN");
-      } else {
-        println!("Login successful");
-        println!("logged in on client: {:?}", client);
+        return MenuAction::Render;
+      },
+      Ok(client) => client
+    };
 
-        return  MenuAction::RenderLoginMenu(client.card_number);
-      }
+    if client.pin != pin {
+      println!("Invalid login or PIN");
+
+      return MenuAction::Render;
     }
-    // TODO handle error
 
-    MenuAction::Render
+    println!("Login successful");
+    println!("logged in on client: {:?}", client);
+
+    MenuAction::RenderLoginMenu(client.card_number)
   }
 }
 
+fn print_error(error: Report<LoginError>) {
+  println!("Login failed: {:?}", error);
+}
+
 mod cmd_impl {
-  pub fn read(prompt: &str) -> Result<String, ()> {
+  use super::*;
+
+  pub fn read(prompt: &str) -> LoginResult<String> {
     println!("{}", prompt);
-    // TODO remove unwrap ?
+
     let mut buf = String::new();
-    std::io::stdin().read_line(&mut buf).unwrap();
+    std::io::stdin().read_line(&mut buf)
+    .report()
+    .attach_printable(format!("failed to read from console, prompt: {prompt:?}"))
+    .change_context(LoginError)?;
+
     let login = buf.trim_end();
 
     Ok(String::from(login))

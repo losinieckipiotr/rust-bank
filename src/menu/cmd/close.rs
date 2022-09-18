@@ -1,20 +1,20 @@
 use crate::menu::{MenuAction, Cmd};
 use crate::Database;
 
-pub struct  ExitCmd;
+pub struct  CloseCmd;
 
-impl ExitCmd {
+impl CloseCmd {
   pub fn new() -> Self {
-    ExitCmd {}
+    CloseCmd {}
   }
 }
 
-impl Cmd for ExitCmd {
+impl Cmd for CloseCmd {
   fn name(&self) -> &str {
-    "Exit"
+    "Close"
   }
 
   fn exec(&self, _db: &mut dyn Database) -> MenuAction {
-    MenuAction::Exit
+    MenuAction::Close
   }
 }
