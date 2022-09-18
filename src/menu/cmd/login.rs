@@ -7,13 +7,21 @@ use error_stack::{Context, IntoReport, Report, Result, ResultExt};
 use std::fmt;
 
 #[derive(Debug)]
-pub struct LoginError;
+pub enum LoginError {
+  InvalidLoginOrPin,
+  GettingClientFailed,
+  ReadFromConsoleFailed,
+}
 
 type LoginResult<T> = Result<T, LoginError>;
 
 impl fmt::Display for LoginError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "conversion data to json string failed")
+    match &self {
+      LoginError::InvalidLoginOrPin => write!(f, "invalid login or PIN"),
+      LoginError::GettingClientFailed => write!(f, "failed to get client from database"),
+      LoginError::ReadFromConsoleFailed => write!(f, "failed to read from console"),
+    }
   }
 }
 
@@ -31,6 +39,9 @@ impl LoginCmd {
   }
 }
 
+const LOGIN_PROMPT: &str = "Enter login:";
+const PIN_PROMPT: &str = "Enter PIN:";
+
 impl Cmd for LoginCmd {
   fn name(&self) -> &str {
     "Login"
@@ -39,35 +50,35 @@ impl Cmd for LoginCmd {
   fn exec(&self, db: &mut dyn Database) -> MenuAction {
     let read_from_cmd = self.read_from_cmd.as_ref();
 
-    let login = match read_from_cmd("Enter login:") {
+    let login = match read_from_cmd(LOGIN_PROMPT) {
       Err(error) => {
-        print_error(error);
+        print_report(error);
 
         return MenuAction::Render;
       },
       Ok(login) => login,
     };
 
-    let pin = match read_from_cmd("Enter PIN:") {
+    let pin = match read_from_cmd(PIN_PROMPT) {
       Err(error) => {
-        print_error(error);
+        print_report(error);
         return MenuAction::Render;
       },
       Ok(pin) => pin,
     };
 
     if !db.has_client(&login) {
-      println!("Invalid login or PIN");
+      print_invalid_login_or_pin();
 
       return MenuAction::Render;
     }
 
     let client = match db.get_client(&login) {
       Err(error) => {
-        print_error(
+        print_report(
           error
-          .attach_printable("failed to ged client from database")
-          .change_context(LoginError)
+          .attach_printable(format!("login: {login}"))
+          .change_context(LoginError::GettingClientFailed)
         );
 
         return MenuAction::Render;
@@ -76,7 +87,7 @@ impl Cmd for LoginCmd {
     };
 
     if client.pin != pin {
-      println!("Invalid login or PIN");
+      print_invalid_login_or_pin();
 
       return MenuAction::Render;
     }
@@ -88,8 +99,13 @@ impl Cmd for LoginCmd {
   }
 }
 
-fn print_error(error: Report<LoginError>) {
-  println!("Login failed: {:?}", error);
+fn print_invalid_login_or_pin() {
+  let error = LoginError::InvalidLoginOrPin;
+  println!("{error:?}");
+}
+
+fn print_report(error: Report<LoginError>) {
+  println!("{error:?}");
 }
 
 mod cmd_impl {
@@ -101,8 +117,8 @@ mod cmd_impl {
     let mut buf = String::new();
     std::io::stdin().read_line(&mut buf)
     .report()
-    .attach_printable(format!("failed to read from console, prompt: {prompt:?}"))
-    .change_context(LoginError)?;
+    .attach_printable(format!("{prompt}"))
+    .change_context(LoginError::ReadFromConsoleFailed)?;
 
     let login = buf.trim_end();
 
@@ -124,9 +140,9 @@ mod tests {
     let login_cmd = LoginCmd {
       read_from_cmd: Box::new(move |prompt| {
         match prompt {
-          "Enter login:" => Ok(client.card_number.clone()),
-          "Enter PIN:" => Ok(client.pin.clone()),
-          _ => panic!("prompt changed ?"),
+          LOGIN_PROMPT => Ok(client.card_number.clone()),
+          PIN_PROMPT => Ok(client.pin.clone()),
+          _prompt => panic!("unknown prompt: {_prompt}"),
         }
       })
     };
