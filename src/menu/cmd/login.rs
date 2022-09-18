@@ -1,5 +1,5 @@
 use crate::menu::Cmd;
-use crate::Database;
+use crate::{Database, Client};
 use crate::menu::MenuAction;
 
 use error_stack::{Context, IntoReport, Report, Result, ResultExt};
@@ -37,6 +37,27 @@ impl LoginCmd {
       read_from_cmd: Box::new(cmd_impl::read),
     }
   }
+
+  fn login_impl(&self, db: &mut dyn Database) -> LoginResult<Client> {
+    let read_from_cmd = self.read_from_cmd.as_ref();
+
+    let login = read_from_cmd(LOGIN_PROMPT)?;
+    let pin = read_from_cmd(PIN_PROMPT)?;
+
+    if !db.has_client(&login) {
+      return Err(Report::new(LoginError::InvalidLoginOrPin));
+    }
+
+    let client = db.get_client(&login)
+      .attach_printable(format!("login: {login}"))
+      .change_context(LoginError::GettingClientFailed)?;
+
+    if client.pin != pin {
+      return Err(Report::new(LoginError::InvalidLoginOrPin));
+    }
+
+    Ok(client)
+  }
 }
 
 const LOGIN_PROMPT: &str = "Enter login:";
@@ -48,64 +69,24 @@ impl Cmd for LoginCmd {
   }
 
   fn exec(&self, db: &mut dyn Database) -> MenuAction {
-    let read_from_cmd = self.read_from_cmd.as_ref();
+    match self.login_impl(db) {
+      Err(report) => {
+        print_report(report);
 
-    let login = match read_from_cmd(LOGIN_PROMPT) {
-      Err(error) => {
-        print_report(error);
-
-        return MenuAction::Render;
+        MenuAction::Render
       },
-      Ok(login) => login,
-    };
+      Ok(client) => {
+        println!("Login successful");
+        println!("logged in on client: {:?}", client);
 
-    let pin = match read_from_cmd(PIN_PROMPT) {
-      Err(error) => {
-        print_report(error);
-        return MenuAction::Render;
+        MenuAction::RenderLoginMenu(client.card_number)
       },
-      Ok(pin) => pin,
-    };
-
-    if !db.has_client(&login) {
-      print_invalid_login_or_pin();
-
-      return MenuAction::Render;
     }
-
-    let client = match db.get_client(&login) {
-      Err(error) => {
-        print_report(
-          error
-          .attach_printable(format!("login: {login}"))
-          .change_context(LoginError::GettingClientFailed)
-        );
-
-        return MenuAction::Render;
-      },
-      Ok(client) => client
-    };
-
-    if client.pin != pin {
-      print_invalid_login_or_pin();
-
-      return MenuAction::Render;
-    }
-
-    println!("Login successful");
-    println!("logged in on client: {:?}", client);
-
-    MenuAction::RenderLoginMenu(client.card_number)
   }
 }
 
-fn print_invalid_login_or_pin() {
-  let error = LoginError::InvalidLoginOrPin;
-  println!("{error:?}");
-}
-
 fn print_report(error: Report<LoginError>) {
-  println!("{error:?}");
+  println!("\nlogin failed: {error:?}");
 }
 
 mod cmd_impl {

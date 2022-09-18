@@ -19,9 +19,14 @@ impl Cmd for BalanceCmd {
   }
 
   fn exec(&self, db: &mut dyn Database) -> MenuAction {
-    let client = db.get_client(&self.card_number).expect("logged in client data");
-
-    println!("Your balance: {}", client.balance);
+    match db.get_client(&self.card_number) {
+      Err(error) => {
+        println!("\nfailed to get client data, error:{error:?}");
+      },
+      Ok(client) => {
+        println!("Your balance: {}", client.balance);
+      }
+    }
 
     MenuAction::Render
   }

@@ -31,11 +31,11 @@ impl Cmd for CreateAccountCmd {
     match result {
       Ok(_) => {
         println!("New client created");
-        println!("cardNumber: {}", card_number);
+        println!("card_number: {}", card_number);
         println!("pin: {}", pin);
       },
       Err(error) => {
-        println!("Creating client account failed: {:?}", error);
+        println!("\ncreating client account failed: {:?}", error);
       }
     };
 

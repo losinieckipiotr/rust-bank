@@ -3,12 +3,14 @@ mod close;
 mod create_account;
 mod login;
 mod balance;
+mod add_income;
 
 pub use close::CloseCmd;
 pub use exit::ExitCmd;
 pub use create_account::CreateAccountCmd;
 pub use login::LoginCmd;
 pub use balance::BalanceCmd;
+pub use add_income::AddIncomeCmd;
 
 use crate::Database;
 use crate::menu::MenuAction;

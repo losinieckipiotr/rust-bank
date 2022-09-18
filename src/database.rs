@@ -52,6 +52,7 @@ pub trait Database {
   fn save_client(&mut self, client: Client) -> JsonDataBaseResult<()>;
   fn has_client(&self, card_number: &str) -> bool;
   fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client>;
+  fn add_funds(&mut self, funds: u32, card_number: &str) -> JsonDataBaseResult<()>;
   fn get_data(&self) -> DatabaseData;
 }
 
@@ -70,8 +71,8 @@ impl JsonDb {
     };
 
     if let Err(error) = db.read_data() {
-      println!("error: {:?}", error);
-      panic!("Failed to read database");
+      println!("\n failed to read json database, error: {:?}", error);
+      panic!("JsonDb::new() failed");
     }
 
     db
@@ -135,9 +136,22 @@ impl Database for JsonDb {
 
   fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client> {
     match self.data.clients.get(card_number) {
-      None => Err(Report::new(JsonDatabaseError::ClientNotFound)),
+      None => Err(
+        Report::new(JsonDatabaseError::ClientNotFound)
+        .attach_printable(format!("client with card_number: {}, not found?", card_number))
+      ),
       Some(client) => Ok(client.clone()),
     }
+  }
+
+  fn add_funds(&mut self, funds: u32, card_number: &str) -> JsonDataBaseResult<()> {
+    let mut client = self.get_client(card_number)?;
+
+    client.balance += funds as i32;
+
+    self.save_client(client)?;
+
+    Ok(())
   }
 
   fn get_data(&self) -> DatabaseData {
@@ -223,6 +237,10 @@ impl Database for SqliteDb {
 
   fn get_client(&self, _card_number: &str) -> JsonDataBaseResult<Client> {
     panic!("Not implemented!");
+  }
+
+  fn add_funds(&mut self, _funds: u32, _card_number: &str) -> JsonDataBaseResult<()> {
+    panic!("Not implemented")
   }
 
   fn get_data(&self) -> DatabaseData {
