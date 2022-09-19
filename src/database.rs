@@ -120,9 +120,10 @@ impl Database for JsonDb {
 
     let json = json_impl::data_to_json_str(&data_copy)?;
 
-    write_json_to_file(&json).or_else(|e| {
-      Err(e.attach_printable(format!("failed to save client: {:?}", client)))
-    })?;
+    write_json_to_file(&json)
+      .attach_printable_lazy(|| {
+        format!("failed to save client: {:?}", client)
+      })?;
 
     // sync data in struct
     self.data = data_copy;
@@ -174,16 +175,14 @@ mod json_impl {
   pub fn data_from_json(json: &str) -> JsonDataBaseResult<DatabaseData> {
     use serde_json::from_str;
 
-    from_str(json).or_else(|err| {
-      Err(err)
-      .report()
-      .attach_printable_lazy(|| {
-        let mut s = String::from("json:\n");
-        s.push_str(json);
-        s
-      })
-      .change_context(JsonDatabaseError::Deserialization)
+    from_str(json)
+    .report()
+    .attach_printable_lazy(|| {
+      let mut s = String::from("json:\n");
+      s.push_str(json);
+      s
     })
+    .change_context(JsonDatabaseError::Deserialization)
   }
 }
 

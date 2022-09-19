@@ -1,7 +1,7 @@
 use crate::menu::{MenuAction, Cmd};
 use crate::Database;
 
-use error_stack::{Context, IntoReport, Report, Result, ResultExt};
+use error_stack::{Context, IntoReport, Result, ResultExt};
 
 use std::fmt;
 
