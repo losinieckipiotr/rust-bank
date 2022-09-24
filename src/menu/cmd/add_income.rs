@@ -39,7 +39,7 @@ impl AddIncomeCmd {
     let income = income_str.parse::<u32>()
       .report()
       .attach_printable_lazy(|| {
-        format!("invalid amount, parsed value: {}", income_str)
+        format!("invalid amount, parsed value: \"{}\"", income_str)
       })
       .change_context(AddIncomeError)?;
 
@@ -112,7 +112,6 @@ mod tests {
 
     let card_number = mock_client.card_number.clone();
     let one_thousand = String::from("1000");
-    let one_thousand_copy = one_thousand.clone();
 
     let add_income_cmd = {
       use std::rc::Rc;
@@ -136,7 +135,7 @@ mod tests {
     assert_eq!(matches, true);
 
     let client = json_db.get_client(&card_number).expect("client with new balance");
-    assert_eq!(client.balance.to_string(), one_thousand_copy)
+    assert_eq!(client.balance.to_string(), "1000")
   }
 }
 

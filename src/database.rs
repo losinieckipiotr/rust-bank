@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use error_stack::{Context, IntoReport, Report, Result, ResultExt};
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap};
 use std::fmt;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -13,12 +13,12 @@ pub struct Client {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DatabaseData {
-  pub clients: HashMap<String, Client>,
+  pub clients: BTreeMap<String, Client>,
 }
 
 impl DatabaseData {
   pub fn new() -> Self {
-    DatabaseData { clients: HashMap::new() }
+    DatabaseData { clients: BTreeMap::new() }
   }
 }
 
@@ -29,6 +29,7 @@ pub enum JsonDatabaseError {
   SavingDatabaseFile,
   ReadingDatabaseFile,
   ClientNotFound,
+  InsufficientFunds,
 }
 
 impl fmt::Display for JsonDatabaseError {
@@ -39,6 +40,7 @@ impl fmt::Display for JsonDatabaseError {
       JsonDatabaseError::ReadingDatabaseFile => write!(f, "reading database file failed"),
       JsonDatabaseError::SavingDatabaseFile => write!(f, "saving database file failed"),
       JsonDatabaseError::ClientNotFound => write!(f, "client not found in database"),
+      JsonDatabaseError::InsufficientFunds => write!(f, "operation failed due to insufficient funds")
     }
   }
 }
@@ -50,9 +52,11 @@ type JsonDataBaseResult<T> = Result<T, JsonDatabaseError>;
 pub trait Database {
   fn name(&self) -> &str;
   fn save_client(&mut self, client: Client) -> JsonDataBaseResult<()>;
+  fn save_clients(&mut self, clients: &[Client]) -> JsonDataBaseResult<()>;
   fn has_client(&self, card_number: &str) -> bool;
   fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client>;
   fn add_funds(&mut self, funds: u32, card_number: &str) -> JsonDataBaseResult<()>;
+  fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> JsonDataBaseResult<()>;
   fn get_data(&self) -> DatabaseData;
 }
 
@@ -131,16 +135,39 @@ impl Database for JsonDb {
     Ok(())
   }
 
+  fn save_clients(&mut self, clients: &[Client]) -> JsonDataBaseResult<()> {
+    // make copy to rollback changes in case of error
+    let mut data_copy = self.data.clone();
+
+    for client in clients {
+      data_copy.clients.insert(client.card_number.clone(), client.clone());
+    }
+
+    let write_json_to_file = self.write_json_to_file.as_ref();
+
+    let json = json_impl::data_to_json_str(&data_copy)?;
+
+    write_json_to_file(&json)
+      .attach_printable_lazy(|| {
+        format!("failed to save {} clients: {:?}", clients.len(), clients)
+      })?;
+
+    // sync data in struct
+    self.data = data_copy;
+
+    Ok(())
+  }
+
   fn has_client(&self, card_number: &str) -> bool {
     self.data.clients.contains_key(card_number)
   }
 
   fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client> {
     match self.data.clients.get(card_number) {
-      None => Err(
-        Report::new(JsonDatabaseError::ClientNotFound)
-        .attach_printable(format!("client with card_number: {}, not found?", card_number))
-      ),
+      None => Err(Report::new(JsonDatabaseError::ClientNotFound))
+        .attach_printable_lazy(|| {
+          format!("client with card_number: {} not found", card_number)
+        }),
       Some(client) => Ok(client.clone()),
     }
   }
@@ -151,6 +178,43 @@ impl Database for JsonDb {
     client.balance += funds as i32;
 
     self.save_client(client)?;
+
+    Ok(())
+  }
+
+  fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> JsonDataBaseResult<()> {
+    let mut sender_client = self.get_client(sender_card_number)
+      .attach_printable_lazy(|| {
+        format!("sender client not found, sender_card_number: {}", sender_card_number)
+      })?;
+
+    let mut receiver_client = self.get_client(receiver_card_number)
+      .attach_printable_lazy(|| {
+        format!("receiver client not found, receiver_card_number: {}", receiver_card_number)
+      })?;
+
+    let sender_original_balance = sender_client.balance;
+    sender_client.balance -= funds as i32;
+
+    if sender_client.balance < 0 {
+      return Err(Report::new(JsonDatabaseError::InsufficientFunds))
+        .attach_printable_lazy(|| {
+          format!(
+            "sender's balance before transfer: {}, after transfer: {}",
+            sender_original_balance,
+            sender_client.balance
+          )
+        })
+    }
+
+    receiver_client.balance += funds as i32;
+
+    let clients = [sender_client, receiver_client];
+
+    self.save_clients(&clients)
+      .attach_printable_lazy(|| {
+        format!("failed to save clients data in database")
+      })?;
 
     Ok(())
   }
@@ -230,6 +294,10 @@ impl Database for SqliteDb {
     panic!("Not implemented!");
   }
 
+  fn save_clients(&mut self, _clients: &[Client]) -> JsonDataBaseResult<()> {
+    panic!("Not implemented!");
+  }
+
   fn has_client(&self, _card_number: &str) -> bool {
     panic!("Not implemented!");
   }
@@ -240,6 +308,10 @@ impl Database for SqliteDb {
 
   fn add_funds(&mut self, _funds: u32, _card_number: &str) -> JsonDataBaseResult<()> {
     panic!("Not implemented")
+  }
+
+  fn transfer_funds(&mut self, _funds: u32, _sender_card_number: &str, _receiver_card_number: &str) -> JsonDataBaseResult<()> {
+    panic!("not implemented")
   }
 
   fn get_data(&self) -> DatabaseData {

@@ -1,4 +1,4 @@
-use crate::menu::cmd::{CloseCmd, ExitCmd, BalanceCmd, AddIncomeCmd};
+use crate::menu::cmd::{CloseCmd, ExitCmd, BalanceCmd, AddIncomeCmd, DoTransferCmd};
 use crate::menu::Menu;
 
 pub struct LoginMenu;
@@ -10,6 +10,7 @@ impl LoginMenu {
       commands: vec![
         Box::new(BalanceCmd::new(card_number.clone())),
         Box::new(AddIncomeCmd::new(card_number.clone())),
+        Box::new(DoTransferCmd::new(card_number.clone())),
         Box::new(CloseCmd::new()),
         Box::new(ExitCmd::new()),
       ]
