@@ -136,7 +136,6 @@ mod tests {
       },
       _ => false
     };
-
     assert_eq!(success, true);
   }
 }

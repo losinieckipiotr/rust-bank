@@ -70,7 +70,7 @@ impl Cmd for DoTransferCmd {
   fn exec(&self, db: &mut dyn Database) -> MenuAction {
     match self.do_transfer_impl(db) {
       Err(error) => {
-        println!("error: {error:?}");
+        println!("\nerror: {error:?}");
       },
       Ok(amount) => {
         println!("transferred: {}", amount);

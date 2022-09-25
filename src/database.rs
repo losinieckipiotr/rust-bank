@@ -55,6 +55,7 @@ pub trait Database {
   fn save_clients(&mut self, clients: &[Client]) -> JsonDataBaseResult<()>;
   fn has_client(&self, card_number: &str) -> bool;
   fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client>;
+  fn remove_client(&mut self, card_number: &str) -> JsonDataBaseResult<Client>;
   fn add_funds(&mut self, funds: u32, card_number: &str) -> JsonDataBaseResult<()>;
   fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> JsonDataBaseResult<()>;
   fn get_data(&self) -> DatabaseData;
@@ -92,11 +93,7 @@ impl JsonDb {
         // self.data must be empty
         assert_eq!(self.data,  DatabaseData::new());
 
-        let json = json_impl::data_to_json_str(&self.data)?;
-
-        let write_json_to_file = self.write_json_to_file.as_ref();
-
-        write_json_to_file(&json)
+        self.save_data()
           .attach_printable("creating new database file failed")?;
       },
       Ok(str) => {
@@ -108,6 +105,19 @@ impl JsonDb {
 
     Ok(())
   }
+
+  fn save_data(&self) -> JsonDataBaseResult<()> {
+    let write_json_to_file = self.write_json_to_file.as_ref();
+
+    let json = json_impl::data_to_json_str(&self.data)?;
+
+    write_json_to_file(&json)
+      .attach_printable_lazy(|| {
+        format!("failed to save data")
+      })?;
+
+    Ok(())
+  }
 }
 
 impl Database for JsonDb {
@@ -116,44 +126,26 @@ impl Database for JsonDb {
   }
 
   fn save_client(&mut self, client: Client) -> JsonDataBaseResult<()> {
-    // make copy to rollback changes in case of error
-    let mut data_copy = self.data.clone();
-    data_copy.clients.insert(client.card_number.clone(), client.clone());
-
-    let write_json_to_file = self.write_json_to_file.as_ref();
-
-    let json = json_impl::data_to_json_str(&data_copy)?;
-
-    write_json_to_file(&json)
-      .attach_printable_lazy(|| {
-        format!("failed to save client: {:?}", client)
-      })?;
-
-    // sync data in struct
-    self.data = data_copy;
-
-    Ok(())
+    self.save_clients(&[client])
   }
 
   fn save_clients(&mut self, clients: &[Client]) -> JsonDataBaseResult<()> {
     // make copy to rollback changes in case of error
-    let mut data_copy = self.data.clone();
+    let data_copy = self.data.clone();
 
     for client in clients {
-      data_copy.clients.insert(client.card_number.clone(), client.clone());
+      self.data.clients.insert(client.card_number.clone(), client.clone());
     }
 
-    let write_json_to_file = self.write_json_to_file.as_ref();
-
-    let json = json_impl::data_to_json_str(&data_copy)?;
-
-    write_json_to_file(&json)
-      .attach_printable_lazy(|| {
-        format!("failed to save {} clients: {:?}", clients.len(), clients)
-      })?;
-
-    // sync data in struct
-    self.data = data_copy;
+    self.save_data()
+    .attach_printable_lazy(|| {
+      format!("failed to save {} clients: {:?}", clients.len(), clients)
+    })
+    .or_else(|err| {
+      // rollback
+      self.data = data_copy;
+      Err(err)
+    })?;
 
     Ok(())
   }
@@ -170,6 +162,20 @@ impl Database for JsonDb {
         }),
       Some(client) => Ok(client.clone()),
     }
+  }
+
+  fn remove_client(&mut self, card_number: &str) -> JsonDataBaseResult<Client> {
+    let client = match self.data.clients.remove(card_number) {
+      None => Err(Report::new(JsonDatabaseError::ClientNotFound))
+        .attach_printable_lazy(|| {
+          format!("client with card_number: {} is not present in database", card_number)
+        }),
+      Some(client) => Ok(client)
+    };
+
+    self.save_data()?;
+
+    client
   }
 
   fn add_funds(&mut self, funds: u32, card_number: &str) -> JsonDataBaseResult<()> {
@@ -266,15 +272,19 @@ mod fs_impl {
 
   pub fn write_json_to_file(json: &str) -> JsonDataBaseResult<()> {
     let mut file = OpenOptions::new()
-      .read(true)
-      .write(true)
       .create(true)
+      .truncate(true)
+      .write(true)
       .open(FILE_NAME)
       .report()
       .attach_printable(format!("failed to open file: {}", FILE_NAME))
       .change_context(JsonDatabaseError::SavingDatabaseFile)?;
 
-    file.write_all(json.as_bytes())
+    let mut json_copy = String::from(json.clone());
+    json_copy.push('\n');
+    let json_bytes = json_copy.as_bytes();
+
+    file.write_all(json_bytes)
     .report()
     .attach_printable(format!("failed write to file: {}", FILE_NAME))
     .change_context(JsonDatabaseError::SavingDatabaseFile)?;
@@ -303,6 +313,10 @@ impl Database for SqliteDb {
   }
 
   fn get_client(&self, _card_number: &str) -> JsonDataBaseResult<Client> {
+    panic!("Not implemented!");
+  }
+
+  fn remove_client(&mut self, _card_number: &str) -> JsonDataBaseResult<Client> {
     panic!("Not implemented!");
   }
 

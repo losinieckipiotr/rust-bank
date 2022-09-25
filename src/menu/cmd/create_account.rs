@@ -5,7 +5,7 @@ use rand::prelude::{thread_rng, IteratorRandom};
 
 const DIGITS: &str = "0123456789";
 
-pub struct  CreateAccountCmd;
+pub struct CreateAccountCmd;
 
 impl CreateAccountCmd {
   pub fn new() -> Self {
@@ -22,13 +22,13 @@ impl Cmd for CreateAccountCmd {
     let card_number = generate_card_number();
     let pin = generate_pin();
 
-    let result = db.save_client(Client {
+    let new_client = Client {
       card_number: card_number.clone(),
       pin: pin.clone(),
       balance: 0,
-    });
+    };
 
-    match result {
+    match db.save_client(new_client) {
       Ok(_) => {
         println!("New client created");
         println!("card_number: {}", card_number);
@@ -84,7 +84,6 @@ mod tests {
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
-
     assert_eq!(json_db.get_data().clients.len(), 1);
   }
 }

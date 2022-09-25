@@ -5,6 +5,7 @@ mod login;
 mod balance;
 mod add_income;
 mod do_transfer;
+mod close_account;
 
 pub use close::CloseCmd;
 pub use exit::ExitCmd;
@@ -13,6 +14,7 @@ pub use login::LoginCmd;
 pub use balance::BalanceCmd;
 pub use add_income::AddIncomeCmd;
 pub use do_transfer::DoTransferCmd;
+pub use close_account::CloseAccountCmd;
 
 use crate::Database;
 use crate::menu::MenuAction;

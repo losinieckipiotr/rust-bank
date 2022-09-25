@@ -1,4 +1,4 @@
-use crate::menu::cmd::{CloseCmd, ExitCmd, BalanceCmd, AddIncomeCmd, DoTransferCmd};
+use crate::menu::cmd::*;
 use crate::menu::Menu;
 
 pub struct LoginMenu;
@@ -11,6 +11,7 @@ impl LoginMenu {
         Box::new(BalanceCmd::new(card_number.clone())),
         Box::new(AddIncomeCmd::new(card_number.clone())),
         Box::new(DoTransferCmd::new(card_number.clone())),
+        Box::new(CloseAccountCmd::new(card_number.clone())),
         Box::new(CloseCmd::new()),
         Box::new(ExitCmd::new()),
       ]
