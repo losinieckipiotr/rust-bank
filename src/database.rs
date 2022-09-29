@@ -29,40 +29,29 @@ impl DatabaseData {
 }
 
 #[derive(Debug)]
-pub enum JsonDatabaseError {
-  Serialization,
-  Deserialization,
-  SavingDatabaseFile,
-  ReadingDatabaseFile,
-  ClientNotFound,
-  InsufficientFunds,
+pub enum DatabaseError {
+  JSON,
+  SQLite,
 }
 
-impl fmt::Display for JsonDatabaseError {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match *self {
-      JsonDatabaseError::Serialization => write!(f, "conversion data to json string failed"),
-      JsonDatabaseError::Deserialization => write!(f, "json string conversion to data failed"),
-      JsonDatabaseError::ReadingDatabaseFile => write!(f, "reading database file failed"),
-      JsonDatabaseError::SavingDatabaseFile => write!(f, "saving database file failed"),
-      JsonDatabaseError::ClientNotFound => write!(f, "client not found in database"),
-      JsonDatabaseError::InsufficientFunds => write!(f, "operation failed due to insufficient funds")
-    }
+impl fmt::Display for DatabaseError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "database operation failed")
   }
 }
 
-impl Context for JsonDatabaseError {}
+impl Context for DatabaseError {}
 
-pub type JsonDataBaseResult<T> = Result<T, JsonDatabaseError>;
+pub type DatabaseResult<T> = Result<T, DatabaseError>;
 
 pub trait Database {
   fn name(&self) -> &str;
-  fn save_client(&mut self, client: Client) -> JsonDataBaseResult<()>;
-  fn save_clients(&mut self, clients: &[Client]) -> JsonDataBaseResult<()>;
+  fn save_client(&mut self, client: Client) -> DatabaseResult<()>;
+  fn save_clients(&mut self, clients: &[Client]) -> DatabaseResult<()>;
   fn has_client(&self, card_number: &str) -> bool;
-  fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client>;
-  fn remove_client(&mut self, card_number: &str) -> JsonDataBaseResult<Client>;
-  fn add_funds(&mut self, funds: u32, card_number: &str) -> JsonDataBaseResult<()>;
-  fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> JsonDataBaseResult<()>;
+  fn get_client(&self, card_number: &str) -> DatabaseResult<Client>;
+  fn remove_client(&mut self, card_number: &str) -> DatabaseResult<Client>;
+  fn add_funds(&mut self, funds: u32, card_number: &str) -> DatabaseResult<()>;
+  fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> DatabaseResult<()>;
   fn get_data(&self) -> DatabaseData;
 }

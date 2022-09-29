@@ -1,10 +1,38 @@
 use crate::Database;
 use crate::Client;
-use crate::JsonDataBaseResult;
+use crate::{DatabaseError, DatabaseResult};
 use crate::DatabaseData;
-use crate::JsonDatabaseError;
 
-use error_stack::{IntoReport, Report, ResultExt};
+use error_stack::{Context, Result, IntoReport, Report, ResultExt};
+
+use std::fmt;
+
+#[derive(Debug)]
+pub enum JsonDatabaseError {
+  Serialization,
+  Deserialization,
+  SavingDatabaseFile,
+  ReadingDatabaseFile,
+  ClientNotFound,
+  InsufficientFunds,
+}
+
+impl fmt::Display for JsonDatabaseError {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      JsonDatabaseError::Serialization => write!(f, "conversion data to json string failed"),
+      JsonDatabaseError::Deserialization => write!(f, "json string conversion to data failed"),
+      JsonDatabaseError::ReadingDatabaseFile => write!(f, "reading database file failed"),
+      JsonDatabaseError::SavingDatabaseFile => write!(f, "saving database file failed"),
+      JsonDatabaseError::ClientNotFound => write!(f, "client not found in database"),
+      JsonDatabaseError::InsufficientFunds => write!(f, "operation failed due to insufficient funds")
+    }
+  }
+}
+
+impl Context for JsonDatabaseError {}
+
+pub type JsonDataBaseResult<T> = Result<T, JsonDatabaseError>;
 
 pub struct JsonDb {
   data: DatabaseData,
@@ -70,11 +98,11 @@ impl Database for JsonDb {
     "json"
   }
 
-  fn save_client(&mut self, client: Client) -> JsonDataBaseResult<()> {
+  fn save_client(&mut self, client: Client) -> DatabaseResult<()> {
     self.save_clients(&[client])
   }
 
-  fn save_clients(&mut self, clients: &[Client]) -> JsonDataBaseResult<()> {
+  fn save_clients(&mut self, clients: &[Client]) -> DatabaseResult<()> {
     // make copy to rollback changes in case of error
     let data_copy = self.data.clone();
 
@@ -83,14 +111,15 @@ impl Database for JsonDb {
     }
 
     self.save_data()
-    .attach_printable_lazy(|| {
-      format!("failed to save {} clients: {:?}", clients.len(), clients)
-    })
-    .or_else(|err| {
-      // rollback
-      self.data = data_copy;
-      Err(err)
-    })?;
+      .attach_printable_lazy(|| {
+        format!("failed to save {} clients: {:?}", clients.len(), clients)
+      })
+      .or_else(|err| {
+        // rollback
+        self.data = data_copy;
+        Err(err)
+      })
+      .change_context(DatabaseError::JSON)?;
 
     Ok(())
   }
@@ -99,31 +128,33 @@ impl Database for JsonDb {
     self.data.clients.contains_key(card_number)
   }
 
-  fn get_client(&self, card_number: &str) -> JsonDataBaseResult<Client> {
+  fn get_client(&self, card_number: &str) -> DatabaseResult<Client> {
     match self.data.clients.get(card_number) {
       None => Err(Report::new(JsonDatabaseError::ClientNotFound))
         .attach_printable_lazy(|| {
           format!("client with card_number: {} not found", card_number)
-        }),
+        })
+        .change_context(DatabaseError::JSON),
       Some(client) => Ok(client.clone()),
     }
   }
 
-  fn remove_client(&mut self, card_number: &str) -> JsonDataBaseResult<Client> {
+  fn remove_client(&mut self, card_number: &str) -> DatabaseResult<Client> {
     let client = match self.data.clients.remove(card_number) {
       None => Err(Report::new(JsonDatabaseError::ClientNotFound))
         .attach_printable_lazy(|| {
           format!("client with card_number: {} is not present in database", card_number)
-        }),
+        })
+        .change_context(DatabaseError::JSON),
       Some(client) => Ok(client)
     };
 
-    self.save_data()?;
+    self.save_data().change_context(DatabaseError::JSON)?;
 
     client
   }
 
-  fn add_funds(&mut self, funds: u32, card_number: &str) -> JsonDataBaseResult<()> {
+  fn add_funds(&mut self, funds: u32, card_number: &str) -> DatabaseResult<()> {
     let mut client = self.get_client(card_number)?;
 
     client.balance += funds as i32;
@@ -133,7 +164,7 @@ impl Database for JsonDb {
     Ok(())
   }
 
-  fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> JsonDataBaseResult<()> {
+  fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> DatabaseResult<()> {
     let mut sender_client = self.get_client(sender_card_number)
       .attach_printable_lazy(|| {
         format!("sender client not found, sender_card_number: {}", sender_card_number)
@@ -156,6 +187,7 @@ impl Database for JsonDb {
             sender_client.balance
           )
         })
+        .change_context(DatabaseError::JSON)
     }
 
     receiver_client.balance += funds as i32;
