@@ -23,3 +23,10 @@ pub trait Cmd {
   fn name(&self) -> &str;
   fn exec(&self, db: &mut dyn Database) -> MenuAction;
 }
+
+impl<C> From<C> for Box<dyn Cmd>
+where C: Cmd + 'static {
+  fn from(cmd: C) -> Self {
+      Box::new(cmd)
+  }
+}

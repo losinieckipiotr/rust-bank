@@ -8,9 +8,9 @@ impl MainMenu {
     Menu {
       header: String::from("Main menu"),
       commands: vec![
-        Box::new(CreateAccountCmd::new()),
-        Box::new(LoginCmd::new()),
-        Box::new(ExitCmd::new()),
+        CreateAccountCmd::new().into(),
+        LoginCmd::new().into(),
+        ExitCmd::new().into(),
       ],
     }
   }
