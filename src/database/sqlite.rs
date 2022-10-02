@@ -34,6 +34,8 @@ impl SQLiteDb {
     SQLiteDb
   }
 
+  // TODO get_connection for testing ? and test db in memory ?
+
   fn create_clients_table() {
     let conn = Connection::open("clients.db").unwrap();
     conn.execute(
