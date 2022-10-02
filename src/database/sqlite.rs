@@ -63,26 +63,18 @@ impl SQLiteDb {
     ).unwrap();
   }
 
-  fn save_clients(&mut self, clients: &[Client]) -> DatabaseResult<()> {
-    let mut conn = Connection::open("clients.db").unwrap();
-    let tx = conn.transaction().unwrap();
-    for client in clients {
-      tx.execute(
-        "
-          UPDATE clients
-          SET pin = ?1, balance = ?2
-          WHERE cardNumber = ?3
-        ",
-        params![
-          client.pin,
-          client.balance,
-          client.card_number,
-        ]
-      ).unwrap();
-    }
-    tx.commit().unwrap();
-
-    Ok(())
+  fn update_balance(client: &Client, conn: &Connection) {
+    conn.execute(
+      "
+        UPDATE clients
+        SET balance = ?1
+        WHERE cardNumber = ?2
+      ",
+      params![
+        client.balance,
+        client.card_number
+      ]
+    ).unwrap();
   }
 }
 
@@ -193,12 +185,13 @@ impl Database for SQLiteDb {
 
     receiver_client.balance += funds as i32;
 
-    let clients = [sender_client, receiver_client];
+    let mut conn = Connection::open("clients.db").unwrap();
+    let tx = conn.transaction().unwrap();
 
-    self.save_clients(&clients)
-      .attach_printable_lazy(|| {
-        format!("failed to save clients data in database")
-      })?;
+    SQLiteDb::update_balance(&sender_client, &tx);
+    SQLiteDb::update_balance(&receiver_client, &tx);
+
+    tx.commit().unwrap();
 
     Ok(())
   }

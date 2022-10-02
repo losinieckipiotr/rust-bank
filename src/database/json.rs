@@ -35,7 +35,7 @@ impl Context for JsonDatabaseError {}
 pub type JsonDataBaseResult<T> = Result<T, JsonDatabaseError>;
 
 pub struct JsonDb {
-  data: DatabaseData,
+  data: DatabaseData, // TODO do not store data in RAM
   read_json_file: Box<dyn Fn() -> JsonDataBaseResult<String>>,
   write_json_to_file: Box<dyn Fn(&str) -> JsonDataBaseResult<()>>,
 }
