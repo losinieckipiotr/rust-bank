@@ -136,8 +136,8 @@ impl Database for JsonDb {
     Ok(())
   }
 
-  fn has_client(&self, card_number: &str) -> bool {
-    self.data.clients.contains_key(card_number)
+  fn has_client(&self, card_number: &str) -> DatabaseResult<bool> {
+    Ok(self.data.clients.contains_key(card_number))
   }
 
   fn get_client(&self, card_number: &str) -> DatabaseResult<Client> {

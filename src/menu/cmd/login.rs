@@ -44,8 +44,16 @@ impl LoginCmd {
     let login = read_from_cmd(LOGIN_PROMPT)?;
     let pin = read_from_cmd(PIN_PROMPT)?;
 
-    if !db.has_client(&login) {
-      return Err(Report::new(LoginError::InvalidLoginOrPin));
+    match db.has_client(&login) {
+      Err(error) => {
+        return Err(error)
+          .change_context(LoginError::GettingClientFailed)
+      },
+      Ok(has_client) => {
+        if !has_client {
+          return Err(Report::new(LoginError::InvalidLoginOrPin));
+        }
+      },
     }
 
     let client = db.get_client(&login)

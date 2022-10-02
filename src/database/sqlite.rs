@@ -6,20 +6,28 @@ use crate::DatabaseError;
 
 use rusqlite::params;
 
-use error_stack::{Context, Report, ResultExt};
+use error_stack::{Context, Result, IntoReport, Report, ResultExt};
 
 use std::fmt;
 
-// pub type SQLiteDataBaseResult<T> = Result<T, SQLiteDatabaseError>;
+pub type SQLiteDataBaseResult<T> = Result<T, SQLiteDatabaseError>;
 
 // TODO error handling
 
 #[derive(Debug)]
-pub struct SQLiteDatabaseError;
+pub enum SQLiteDatabaseError {
+  QueryFailed,
+  PrepareQueryFailed,
+  ClientAlreadyExists(Client),
+}
 
 impl fmt::Display for SQLiteDatabaseError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "sqlite operation failed")
+    match self {
+      Self::QueryFailed => write!(f, "sqlite query failed"),
+      Self::PrepareQueryFailed => write!(f, "prepare sqlite query failed"),
+      Self::ClientAlreadyExists(client) => write!(f, "client already exists in database, {client:?}"),
+    }
   }
 }
 
@@ -39,13 +47,15 @@ impl SQLiteDb {
       connection: get_connection_impl()
     };
 
-    db.create_clients_table();
+    if let Err(error) = db.create_clients_table() {
+      println!("\n failed to create clients table, error: {:?}", error);
+      panic!("SQLiteDb::new() failed");
+    }
 
     db
   }
 
-  // TODO return result
-  fn create_clients_table(&self) {
+  fn create_clients_table(&self) -> SQLiteDataBaseResult<()> {
     self.connection.execute(
       "
         CREATE TABLE IF NOT EXISTS clients(
@@ -56,11 +66,19 @@ impl SQLiteDb {
         )
       ",
       []
-    ).unwrap();
+    )
+      .report()
+      .attach_printable(
+        format!("failed to execute CREATE TABLE query")
+      )
+      .change_context(SQLiteDatabaseError::QueryFailed)?;
+
+      Ok(())
+
   }
 
-  fn insert_client(client: &Client, conn: &rusqlite::Connection) {
-    conn.execute(
+  fn insert_client(&self, client: &Client) -> SQLiteDataBaseResult<()> {
+    self.connection.execute(
       "
         INSERT INTO clients(cardNumber, pin, balance)
         VALUES(?1, ?2, ?3)
@@ -70,7 +88,14 @@ impl SQLiteDb {
         client.pin,
         client.balance
       ]
-    ).unwrap();
+    )
+    .report()
+    .attach_printable_lazy(|| {
+      format!("failed to execute INSERT query for {client:?}")
+    })
+    .change_context(SQLiteDatabaseError::QueryFailed)?;
+
+    Ok(())
   }
 
   fn update_client_balance(client: &Client, conn: &rusqlite::Connection) {
@@ -94,20 +119,50 @@ impl Database for SQLiteDb {
   }
 
   fn save_new_client(&mut self, client: Client) -> DatabaseResult<()> {
-    // TODO check if already exists
-    SQLiteDb::insert_client(&client, &self.connection);
+    let has_client = self.has_client(&client.card_number)?;
+
+    if has_client {
+      return Err(
+        Report::new(
+          SQLiteDatabaseError::ClientAlreadyExists(client)
+        )
+          .change_context(DatabaseError::SQLite)
+      );
+    }
+
+    self.insert_client(&client)
+      .attach_printable_lazy(|| {
+        format!("failed to insert client to database")
+      })
+      .change_context(DatabaseError::SQLite)?;
 
     Ok(())
   }
 
-  fn has_client(&self, card_number: &str) -> bool {
+  fn has_client(&self, card_number: &str) -> DatabaseResult<bool> {
     let mut stmt = self.connection.prepare(
       "
         SELECT * FROM clients
         WHERE cardNumber = ?
       "
-    ).unwrap();
-    stmt.exists([&card_number]).unwrap()
+    )
+      .report()
+      .change_context(SQLiteDatabaseError::PrepareQueryFailed)
+      .change_context(DatabaseError::SQLite)?;
+
+    match stmt.exists([&card_number]) {
+      Err(error) => Err(error)
+        .report()
+        .change_context(SQLiteDatabaseError::QueryFailed)
+        .attach_printable_lazy( || {
+          format!(
+            "failed to check if client with card_number: {} exists",
+            card_number
+          )
+        })
+        .change_context(DatabaseError::SQLite),
+      Ok(exists) => Ok(exists),
+    }
   }
 
   fn get_client(&self, card_number: &str) -> DatabaseResult<Client> {
@@ -222,7 +277,7 @@ pub mod tests {
       connection: get_mock_connection(),
     };
 
-    sqlite_db.create_clients_table();
+    sqlite_db.create_clients_table().unwrap();
 
     sqlite_db
   }
@@ -238,7 +293,8 @@ pub mod tests {
 
     assert_eq!(sql_db.get_clients_count(), 1);
     assert_eq!(
-      client_mock, sql_db.get_client(&client_mock.card_number.clone()).unwrap()
+      client_mock,
+      sql_db.get_client(&client_mock.card_number.clone()).unwrap()
     );
   }
 

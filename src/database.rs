@@ -47,7 +47,7 @@ pub type DatabaseResult<T> = Result<T, DatabaseError>;
 pub trait Database {
   fn name(&self) -> &str;
   fn save_new_client(&mut self, client: Client) -> DatabaseResult<()>;
-  fn has_client(&self, card_number: &str) -> bool;
+  fn has_client(&self, card_number: &str) -> DatabaseResult<bool>;
   fn get_client(&self, card_number: &str) -> DatabaseResult<Client>;
   fn remove_client(&mut self, card_number: &str) -> DatabaseResult<Client>;
   fn add_funds(&mut self, funds: u32, card_number: &str) -> DatabaseResult<()>;

@@ -29,7 +29,15 @@ impl Cmd for CreateAccountCmd {
     };
 
     // TODO loop, generate until free card_number
-    if db.has_client(&new_client.card_number) {
+    let has_client = match db.has_client(&new_client.card_number) {
+      Err(error) => {
+        println!("\ncreating client account failed: {:?}", error);
+        return MenuAction::Render
+      },
+      Ok(has_client) => has_client,
+    };
+
+    if has_client {
       println!(
         "Failed to create new client, client with card_number: {} already exists",
         new_client.card_number
