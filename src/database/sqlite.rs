@@ -29,12 +29,12 @@ pub struct SQLiteDb;
 
 impl SQLiteDb {
   pub fn new() -> Self {
-    SQLiteDb::create_table();
+    SQLiteDb::create_clients_table();
 
     SQLiteDb
   }
 
-  fn create_table() {
+  fn create_clients_table() {
     let conn = Connection::open("clients.db").unwrap();
     conn.execute(
       "
@@ -63,7 +63,7 @@ impl SQLiteDb {
     ).unwrap();
   }
 
-  fn update_balance(client: &Client, conn: &Connection) {
+  fn update_client_balance(client: &Client, conn: &Connection) {
     conn.execute(
       "
         UPDATE clients
@@ -180,7 +180,6 @@ impl Database for SQLiteDb {
             sender_client.balance
           )
         })
-        .change_context(DatabaseError::JSON)
     }
 
     receiver_client.balance += funds as i32;
@@ -188,8 +187,8 @@ impl Database for SQLiteDb {
     let mut conn = Connection::open("clients.db").unwrap();
     let tx = conn.transaction().unwrap();
 
-    SQLiteDb::update_balance(&sender_client, &tx);
-    SQLiteDb::update_balance(&receiver_client, &tx);
+    SQLiteDb::update_client_balance(&sender_client, &tx);
+    SQLiteDb::update_client_balance(&receiver_client, &tx);
 
     tx.commit().unwrap();
 
