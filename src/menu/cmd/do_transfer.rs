@@ -133,8 +133,8 @@ mod tests {
         }),
       }
     };
-    let clients = [mock_client1, mock_client2];
-    json_db.save_clients(&clients).expect("successfully saved mock clients");
+    json_db.save_new_client(mock_client1).unwrap();
+    json_db.save_new_client(mock_client2).unwrap();
 
     let menu_action = do_transfer_cmd.exec(&mut json_db);
 

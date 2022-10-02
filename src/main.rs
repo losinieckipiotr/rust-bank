@@ -32,6 +32,6 @@ fn main() {
 fn db_factory(database: DataBaseType) -> Box<dyn Database> {
   match database {
     DataBaseType::JSON => Box::new(JsonDb::new()),
-    DataBaseType::SQLITE => Box::new(SqliteDb {}),
+    DataBaseType::SQLITE => Box::new(SQLiteDb::new()),
   }
 }

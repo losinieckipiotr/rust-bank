@@ -28,16 +28,24 @@ impl Cmd for CreateAccountCmd {
       balance: 0,
     };
 
-    match db.save_client(new_client) {
+    // TODO loop, generate until free card_number
+    if db.has_client(&new_client.card_number) {
+      println!(
+        "Failed to create new client, client with card_number: {} already exists",
+        new_client.card_number
+      );
+    }
+
+    match db.save_new_client(new_client) {
+      Err(error) => {
+        println!("\ncreating client account failed: {:?}", error);
+      }
       Ok(_) => {
         println!("New client created");
         println!("card_number: {}", card_number);
         println!("pin: {}", pin);
       },
-      Err(error) => {
-        println!("\ncreating client account failed: {:?}", error);
-      }
-    };
+    }
 
     MenuAction::Render
   }
@@ -78,12 +86,12 @@ mod tests {
     let create_account_cmd = CreateAccountCmd::new();
     let mut json_db = crate::database::tests::get_mock_json_db();
 
-    assert_eq!(json_db.get_data().clients.len(), 0);
+    assert_eq!(json_db.get_clients_count(), 0);
 
     let menu_action = create_account_cmd.exec(&mut json_db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
-    assert_eq!(json_db.get_data().clients.len(), 1);
+    assert_eq!(json_db.get_clients_count(), 1);
   }
 }

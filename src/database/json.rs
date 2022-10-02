@@ -91,16 +91,6 @@ impl JsonDb {
 
     Ok(())
   }
-}
-
-impl Database for JsonDb {
-  fn name(&self) -> &str {
-    "json"
-  }
-
-  fn save_client(&mut self, client: Client) -> DatabaseResult<()> {
-    self.save_clients(&[client])
-  }
 
   fn save_clients(&mut self, clients: &[Client]) -> DatabaseResult<()> {
     // make copy to rollback changes in case of error
@@ -118,6 +108,28 @@ impl Database for JsonDb {
         // rollback
         self.data = data_copy;
         Err(err)
+      })
+      .change_context(DatabaseError::JSON)?;
+
+    Ok(())
+  }
+}
+
+impl Database for JsonDb {
+  fn name(&self) -> &str {
+    "json"
+  }
+
+  fn save_new_client(&mut self, client: Client) -> DatabaseResult<()> {
+    // TODO check if already exists
+    self.data.clients.insert(
+      client.card_number.clone(),
+      client.clone()
+    );
+
+    self.save_data()
+      .attach_printable_lazy(|| {
+        format!("failed insert new client, client: {:?}", client)
       })
       .change_context(DatabaseError::JSON)?;
 
@@ -159,7 +171,7 @@ impl Database for JsonDb {
 
     client.balance += funds as i32;
 
-    self.save_client(client)?;
+    self.save_clients(&[client])?;
 
     Ok(())
   }
@@ -202,8 +214,8 @@ impl Database for JsonDb {
     Ok(())
   }
 
-  fn get_data(&self) -> DatabaseData {
-    self.data.clone()
+  fn get_clients_count(&self) -> u32 {
+    self.data.clients.len() as u32
   }
 }
 
@@ -317,7 +329,7 @@ pub mod tests {
       Ok(())
     });
 
-    json_db.save_client(client_mock).expect("client saved");
+    json_db.save_new_client(client_mock).unwrap();
   }
 
   fn get_empty_data_mock() -> Box<dyn Fn() -> JsonDataBaseResult<String>> {

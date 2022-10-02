@@ -115,7 +115,7 @@ mod tests {
   fn should_exec_login_and_return_render_login_action() {
     let mut json_db = crate::database::tests::get_mock_json_db();
     let mock_client = crate::database::tests::get_mock_client();
-    json_db.save_client(mock_client.clone()).expect("successfully saved mock client");
+    json_db.save_new_client(mock_client.clone()).unwrap();
 
     let client = mock_client.clone();
     let login_cmd = LoginCmd {

@@ -10,7 +10,6 @@ impl LoginMenu {
       commands: vec![
         BalanceCmd::new(card_number.clone()).into(),
         AddIncomeCmd::new(card_number.clone()).into(),
-        AddIncomeCmd::new(card_number.clone()).into(),
         DoTransferCmd::new(card_number.clone()).into(),
         CloseAccountCmd::new(card_number.clone()).into(),
         CloseCmd::new().into(),

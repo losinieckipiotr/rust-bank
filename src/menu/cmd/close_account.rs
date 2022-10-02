@@ -43,14 +43,14 @@ mod tests {
   fn should_exec_create_account_cmd() {
     let mut json_db = crate::database::tests::get_mock_json_db();
 
-    assert_eq!(json_db.get_data().clients.len(), 0);
+    assert_eq!(json_db.get_clients_count(), 0);
 
     let mock_client = crate::database::tests::get_mock_client();
     let card_number = mock_client.card_number.clone();
 
-    json_db.save_client(mock_client).unwrap();
+    json_db.save_new_client(mock_client).unwrap();
 
-    assert_eq!(json_db.get_data().clients.len(), 1);
+    assert_eq!(json_db.get_clients_count(), 1);
 
     let close_account_cmd = CloseAccountCmd::new(card_number);
 
@@ -58,6 +58,6 @@ mod tests {
 
     let matches = matches!(menu_action, MenuAction::Close);
     assert_eq!(matches, true);
-    assert_eq!(json_db.get_data().clients.len(), 0);
+    assert_eq!(json_db.get_clients_count(), 0);
   }
 }

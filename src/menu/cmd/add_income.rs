@@ -127,7 +127,7 @@ mod tests {
         }),
       }
     };
-    json_db.save_client(mock_client).expect("successfully saved mock client");
+    json_db.save_new_client(mock_client).unwrap();
 
     let menu_action = add_income_cmd.exec(&mut json_db);
 
