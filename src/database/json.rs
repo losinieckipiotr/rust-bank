@@ -300,17 +300,9 @@ pub mod tests {
     json_db
   }
 
-  pub fn get_mock_client() -> Client {
-    Client {
-      card_number: String::from("4000000000000000"),
-      pin: String::from("1234"),
-      balance: 0
-    }
-  }
-
   #[test]
   fn should_save_client_to_json() {
-    let client_mock = get_mock_client();
+    let client_mock = crate::database::tests::get_mock_client();
 
     let card_number = client_mock.card_number.clone();
     let pin = client_mock.pin.clone();

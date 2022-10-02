@@ -84,7 +84,7 @@ mod tests {
   #[test]
   fn should_exec_create_account_cmd() {
     let create_account_cmd = CreateAccountCmd::new();
-    let mut json_db = crate::database::tests::get_mock_json_db();
+    let mut json_db = crate::database::json::tests::get_mock_json_db();
 
     assert_eq!(json_db.get_clients_count(), 0);
 

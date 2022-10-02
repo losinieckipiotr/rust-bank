@@ -105,7 +105,7 @@ mod tests {
 
   #[test]
   fn should_exec_do_transfer_cmd() {
-    let mut json_db = crate::database::tests::get_mock_json_db();
+    let mut json_db = crate::database::json::tests::get_mock_json_db();
 
     let mock_client1 = crate::database::tests::get_mock_client();
     let mut mock_client2 = crate::database::tests::get_mock_client();

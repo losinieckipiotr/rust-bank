@@ -1,5 +1,5 @@
-mod json;
-mod sqlite;
+pub mod json;
+pub mod sqlite;
 
 use serde::{Deserialize, Serialize};
 use error_stack::{Context, Result};
@@ -53,4 +53,17 @@ pub trait Database {
   fn add_funds(&mut self, funds: u32, card_number: &str) -> DatabaseResult<()>;
   fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> DatabaseResult<()>;
   fn get_clients_count(&self) -> u32; // TODO remove, used only in tests
+}
+
+#[allow(dead_code)]
+pub mod tests {
+  use crate::Client;
+
+  pub fn get_mock_client() -> Client {
+    Client {
+      card_number: String::from("4000000000000000"),
+      pin: String::from("1234"),
+      balance: 0
+    }
+  }
 }

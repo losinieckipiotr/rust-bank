@@ -105,7 +105,7 @@ mod tests {
 
   #[test]
   fn should_exec_add_income_cmd() {
-    let mut json_db = crate::database::tests::get_mock_json_db();
+    let mut json_db = crate::database::json::tests::get_mock_json_db();
     let mock_client = crate::database::tests::get_mock_client();
 
     assert_eq!(mock_client.balance, 0);

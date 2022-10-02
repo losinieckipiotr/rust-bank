@@ -4,7 +4,7 @@ use crate::DatabaseResult;
 // use crate::DatabaseData;
 use crate::DatabaseError;
 
-use rusqlite::{Connection, params};
+use rusqlite::params;
 
 use error_stack::{Context, Report, ResultExt};
 
@@ -12,7 +12,7 @@ use std::fmt;
 
 // pub type SQLiteDataBaseResult<T> = Result<T, SQLiteDatabaseError>;
 
-// TODO error handling, tests
+// TODO error handling
 
 #[derive(Debug)]
 pub struct SQLiteDatabaseError;
@@ -25,20 +25,28 @@ impl fmt::Display for SQLiteDatabaseError {
 
 impl Context for SQLiteDatabaseError {}
 
-pub struct SQLiteDb;
+pub struct SQLiteDb {
+  connection: rusqlite::Connection,
+}
+
+fn get_connection_impl() -> rusqlite::Connection {
+  rusqlite::Connection::open("clients.db").unwrap()
+}
 
 impl SQLiteDb {
   pub fn new() -> Self {
-    SQLiteDb::create_clients_table();
+    let db = SQLiteDb {
+      connection: get_connection_impl()
+    };
 
-    SQLiteDb
+    db.create_clients_table();
+
+    db
   }
 
-  // TODO get_connection for testing ? and test db in memory ?
-
-  fn create_clients_table() {
-    let conn = Connection::open("clients.db").unwrap();
-    conn.execute(
+  // TODO return result
+  fn create_clients_table(&self) {
+    self.connection.execute(
       "
         CREATE TABLE IF NOT EXISTS clients(
           id INTEGER PRIMARY KEY,
@@ -51,7 +59,7 @@ impl SQLiteDb {
     ).unwrap();
   }
 
-  fn insert_client(client: &Client, conn: &Connection) {
+  fn insert_client(client: &Client, conn: &rusqlite::Connection) {
     conn.execute(
       "
         INSERT INTO clients(cardNumber, pin, balance)
@@ -65,7 +73,7 @@ impl SQLiteDb {
     ).unwrap();
   }
 
-  fn update_client_balance(client: &Client, conn: &Connection) {
+  fn update_client_balance(client: &Client, conn: &rusqlite::Connection) {
     conn.execute(
       "
         UPDATE clients
@@ -87,15 +95,13 @@ impl Database for SQLiteDb {
 
   fn save_new_client(&mut self, client: Client) -> DatabaseResult<()> {
     // TODO check if already exists
-    let conn = Connection::open("clients.db").unwrap();
-    SQLiteDb::insert_client(&client, &conn);
+    SQLiteDb::insert_client(&client, &self.connection);
 
     Ok(())
   }
 
   fn has_client(&self, card_number: &str) -> bool {
-    let conn = Connection::open("clients.db").unwrap();
-    let mut stmt = conn.prepare(
+    let mut stmt = self.connection.prepare(
       "
         SELECT * FROM clients
         WHERE cardNumber = ?
@@ -105,9 +111,7 @@ impl Database for SQLiteDb {
   }
 
   fn get_client(&self, card_number: &str) -> DatabaseResult<Client> {
-    let conn = Connection::open("clients.db").unwrap();
-
-    let mut stmt = conn.prepare(
+    let mut stmt = self.connection.prepare(
       "
         SELECT cardNumber, pin, balance
         FROM clients
@@ -126,8 +130,7 @@ impl Database for SQLiteDb {
   fn remove_client(&mut self, card_number: &str) -> DatabaseResult<Client> {
     let client = self.get_client(card_number).unwrap();
 
-    let conn = Connection::open("clients.db").unwrap();
-    conn.execute(
+    self.connection.execute(
       "
         DELETE FROM clients
         WHERE cardNumber = ?
@@ -143,8 +146,7 @@ impl Database for SQLiteDb {
 
     client.balance += funds as i32;
 
-    let conn = Connection::open("clients.db").unwrap();
-    conn.execute(
+    self.connection.execute(
       "
         UPDATE clients
         SET balance = ?1
@@ -186,8 +188,7 @@ impl Database for SQLiteDb {
 
     receiver_client.balance += funds as i32;
 
-    let mut conn = Connection::open("clients.db").unwrap();
-    let tx = conn.transaction().unwrap();
+    let tx = self.connection.transaction().unwrap();
 
     SQLiteDb::update_client_balance(&sender_client, &tx);
     SQLiteDb::update_client_balance(&receiver_client, &tx);
@@ -198,20 +199,51 @@ impl Database for SQLiteDb {
   }
 
   fn get_clients_count(&self) -> u32 {
-    let conn = Connection::open("clients.db").unwrap();
-    let count: u32 = conn
-      .prepare(
-        "
-          SELECT COUNT(*)
-          FROM clients
-        "
-      )
-      .unwrap()
-      .query_row([], |row| {
-        row.get(0)
-      })
-      .unwrap();
+    let count: u32 = self.connection.prepare(
+      "
+        SELECT COUNT(*)
+        FROM clients
+      "
+    )
+    .unwrap()
+    .query_row([], |row| { row.get(0) })
+    .unwrap();
 
     count
   }
 }
+
+#[cfg(test)]
+pub mod tests {
+  use super::*;
+
+  pub fn get_mock_sqlite_db() -> SQLiteDb {
+    let sqlite_db = SQLiteDb {
+      connection: get_mock_connection(),
+    };
+
+    sqlite_db.create_clients_table();
+
+    sqlite_db
+  }
+
+  #[test]
+  fn should_save_client_to_clients_table() {
+    let client_mock = crate::database::tests::get_mock_client();
+    let mut sql_db = get_mock_sqlite_db();
+
+    assert_eq!(sql_db.get_clients_count(), 0);
+
+    sql_db.save_new_client(client_mock.clone()).unwrap();
+
+    assert_eq!(sql_db.get_clients_count(), 1);
+    assert_eq!(
+      client_mock, sql_db.get_client(&client_mock.card_number.clone()).unwrap()
+    );
+  }
+
+  fn get_mock_connection() -> rusqlite::Connection {
+    rusqlite::Connection::open_in_memory().unwrap()
+  }
+}
+

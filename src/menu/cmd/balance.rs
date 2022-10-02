@@ -38,7 +38,7 @@ mod tests {
 
   #[test]
   fn should_exec_balance_cmd() {
-    let mut json_db = crate::database::tests::get_mock_json_db();
+    let mut json_db = crate::database::json::tests::get_mock_json_db();
     let mock_client = crate::database::tests::get_mock_client();
     let balance_cmd = BalanceCmd::new(mock_client.card_number.clone());
     json_db.save_new_client(mock_client).unwrap();
