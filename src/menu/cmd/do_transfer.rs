@@ -104,9 +104,18 @@ mod tests {
   use super::*;
 
   #[test]
-  fn should_exec_do_transfer_cmd() {
-    let mut json_db = crate::database::json::tests::get_mock_json_db();
+  fn should_exec_do_transfer_cmd_json() {
+    let mut db = crate::database::json::tests::get_mock_db();
+    exec_do_transfer_cmd(&mut db);
+  }
 
+  #[test]
+  fn should_exec_do_transfer_cmd_sqlite() {
+    let mut db = crate::database::sqlite::tests::get_mock_db();
+    exec_do_transfer_cmd(&mut db);
+  }
+
+  fn exec_do_transfer_cmd(db: &mut dyn Database) {
     let mock_client1 = crate::database::tests::get_mock_client();
     let mut mock_client2 = crate::database::tests::get_mock_client();
     mock_client2.card_number = String::from("4000000000000001");
@@ -133,16 +142,16 @@ mod tests {
         }),
       }
     };
-    json_db.save_new_client(mock_client1).unwrap();
-    json_db.save_new_client(mock_client2).unwrap();
+    db.save_new_client(mock_client1).unwrap();
+    db.save_new_client(mock_client2).unwrap();
 
-    let menu_action = do_transfer_cmd.exec(&mut json_db);
+    let menu_action = do_transfer_cmd.exec(db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
 
-    let sender_client = json_db.get_client(&sender_card_number).unwrap();
-    let receiver_client = json_db.get_client(&receiver_card_number).unwrap();
+    let sender_client = db.get_client(&sender_card_number).unwrap();
+    let receiver_client = db.get_client(&receiver_card_number).unwrap();
 
     assert_eq!(sender_client.balance.to_string(), "4000");
     assert_eq!(receiver_client.balance.to_string(), "1000");

@@ -286,7 +286,7 @@ mod fs_impl {
 pub mod tests {
   use super::*;
 
-  pub fn get_mock_json_db() -> JsonDb {
+  pub fn get_mock_db() -> JsonDb {
     let mut json_db = JsonDb {
       data: DatabaseData::new(),
       read_json_file: get_empty_data_mock(),
@@ -308,7 +308,7 @@ pub mod tests {
     let pin = client_mock.pin.clone();
     let balance = client_mock.balance;
 
-    let mut json_db = get_mock_json_db();
+    let mut json_db = get_mock_db();
 
     json_db.write_json_to_file = Box::new(move |json| {
       let data: DatabaseData = serde_json::from_str(json).unwrap();

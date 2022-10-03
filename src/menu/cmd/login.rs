@@ -120,10 +120,20 @@ mod tests {
   use super::*;
 
   #[test]
-  fn should_exec_login_and_return_render_login_action() {
-    let mut json_db = crate::database::json::tests::get_mock_json_db();
+  fn should_exec_login_json() {
+    let mut db = crate::database::json::tests::get_mock_db();
+    exec_login(&mut db);
+  }
+
+  #[test]
+  fn should_exec_login_sqlite() {
+    let mut db = crate::database::sqlite::tests::get_mock_db();
+    exec_login(&mut db);
+  }
+
+  fn exec_login(db: &mut dyn Database) {
     let mock_client = crate::database::tests::get_mock_client();
-    json_db.save_new_client(mock_client.clone()).unwrap();
+    db.save_new_client(mock_client.clone()).unwrap();
 
     let client = mock_client.clone();
     let login_cmd = LoginCmd {
@@ -136,7 +146,7 @@ mod tests {
       })
     };
 
-    let menu_action = login_cmd.exec(&mut json_db);
+    let menu_action = login_cmd.exec(db);
 
     let success = match menu_action {
       MenuAction::RenderLoginMenu(card_number) => {

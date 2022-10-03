@@ -90,16 +90,26 @@ mod tests {
   use super::*;
 
   #[test]
-  fn should_exec_create_account_cmd() {
+  fn should_exec_create_account_cmd_json() {
+    let mut db = crate::database::json::tests::get_mock_db();
+    exec_create_account_cmd(&mut db);
+  }
+
+  #[test]
+  fn should_exec_create_account_cmd_sqlite() {
+    let mut db = crate::database::sqlite::tests::get_mock_db();
+    exec_create_account_cmd(&mut db);
+  }
+
+  fn exec_create_account_cmd(db: &mut dyn Database) {
     let create_account_cmd = CreateAccountCmd::new();
-    let mut json_db = crate::database::json::tests::get_mock_json_db();
 
-    assert_eq!(json_db.get_clients_count(), 0);
+    assert_eq!(db.get_clients_count(), 0);
 
-    let menu_action = create_account_cmd.exec(&mut json_db);
+    let menu_action = create_account_cmd.exec(db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
-    assert_eq!(json_db.get_clients_count(), 1);
+    assert_eq!(db.get_clients_count(), 1);
   }
 }

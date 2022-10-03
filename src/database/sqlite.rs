@@ -272,7 +272,7 @@ impl Database for SQLiteDb {
 pub mod tests {
   use super::*;
 
-  pub fn get_mock_sqlite_db() -> SQLiteDb {
+  pub fn get_mock_db() -> SQLiteDb {
     let sqlite_db = SQLiteDb {
       connection: get_mock_connection(),
     };
@@ -285,7 +285,7 @@ pub mod tests {
   #[test]
   fn should_save_client_to_clients_table() {
     let client_mock = crate::database::tests::get_mock_client();
-    let mut sql_db = get_mock_sqlite_db();
+    let mut sql_db = get_mock_db();
 
     assert_eq!(sql_db.get_clients_count(), 0);
 

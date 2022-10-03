@@ -37,13 +37,24 @@ mod tests {
   use super::*;
 
   #[test]
-  fn should_exec_balance_cmd() {
-    let mut json_db = crate::database::json::tests::get_mock_json_db();
+  fn should_exec_balance_cmd_json() {
+    let mut db = crate::database::json::tests::get_mock_db();
+    exec_balance_cmd(&mut db);
+  }
+
+  #[test]
+  fn should_exec_balance_cmd_sqlite() {
+    let mut db = crate::database::sqlite::tests::get_mock_db();
+    exec_balance_cmd(&mut db);
+  }
+
+
+  fn exec_balance_cmd(db: &mut dyn Database) {
     let mock_client = crate::database::tests::get_mock_client();
     let balance_cmd = BalanceCmd::new(mock_client.card_number.clone());
-    json_db.save_new_client(mock_client).unwrap();
+    db.save_new_client(mock_client).unwrap();
 
-    let menu_action = balance_cmd.exec(&mut json_db);
+    let menu_action = balance_cmd.exec(db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
