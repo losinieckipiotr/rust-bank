@@ -105,17 +105,15 @@ mod tests {
 
   #[test]
   fn should_exec_add_income_cmd_json() {
-    let mut db = crate::database::json::tests::get_mock_db();
-    exec_add_income(&mut db);
+    exec_add_income(crate::database::json::tests::get_mock_db());
   }
 
   #[test]
   fn should_exec_add_income_cmd_sqlite() {
-    let mut db = crate::database::json::tests::get_mock_db();
-    exec_add_income(&mut db);
+    exec_add_income(crate::database::sqlite::tests::get_mock_db());
   }
 
-  fn exec_add_income(db: &mut dyn Database) {
+  fn exec_add_income(mut db: impl Database) {
     let mock_client = crate::database::tests::get_mock_client();
 
     assert_eq!(mock_client.balance, 0);
@@ -139,7 +137,7 @@ mod tests {
     };
     db.save_new_client(mock_client).unwrap();
 
-    let menu_action = add_income_cmd.exec(db);
+    let menu_action = add_income_cmd.exec(&mut db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);

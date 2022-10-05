@@ -105,17 +105,15 @@ mod tests {
 
   #[test]
   fn should_exec_do_transfer_cmd_json() {
-    let mut db = crate::database::json::tests::get_mock_db();
-    exec_do_transfer_cmd(&mut db);
+    exec_do_transfer_cmd(crate::database::json::tests::get_mock_db());
   }
 
   #[test]
   fn should_exec_do_transfer_cmd_sqlite() {
-    let mut db = crate::database::sqlite::tests::get_mock_db();
-    exec_do_transfer_cmd(&mut db);
+    exec_do_transfer_cmd(crate::database::sqlite::tests::get_mock_db());
   }
 
-  fn exec_do_transfer_cmd(db: &mut dyn Database) {
+  fn exec_do_transfer_cmd(mut db: impl Database) {
     let mock_client1 = crate::database::tests::get_mock_client();
     let mut mock_client2 = crate::database::tests::get_mock_client();
     mock_client2.card_number = String::from("4000000000000001");
@@ -145,7 +143,7 @@ mod tests {
     db.save_new_client(mock_client1).unwrap();
     db.save_new_client(mock_client2).unwrap();
 
-    let menu_action = do_transfer_cmd.exec(db);
+    let menu_action = do_transfer_cmd.exec(& mut db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);

@@ -91,22 +91,20 @@ mod tests {
 
   #[test]
   fn should_exec_create_account_cmd_json() {
-    let mut db = crate::database::json::tests::get_mock_db();
-    exec_create_account_cmd(&mut db);
+    exec_create_account_cmd(crate::database::json::tests::get_mock_db());
   }
 
   #[test]
   fn should_exec_create_account_cmd_sqlite() {
-    let mut db = crate::database::sqlite::tests::get_mock_db();
-    exec_create_account_cmd(&mut db);
+    exec_create_account_cmd(crate::database::sqlite::tests::get_mock_db());
   }
 
-  fn exec_create_account_cmd(db: &mut dyn Database) {
+  fn exec_create_account_cmd(mut db: impl Database) {
     let create_account_cmd = CreateAccountCmd::new();
 
     assert_eq!(db.get_clients_count(), 0);
 
-    let menu_action = create_account_cmd.exec(db);
+    let menu_action = create_account_cmd.exec(&mut db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
