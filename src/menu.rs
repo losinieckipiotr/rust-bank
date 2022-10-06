@@ -7,9 +7,6 @@ pub use login_menu::LoginMenu;
 pub use cmd::Cmd;
 
 use crate::Database;
-use crate::DataBaseType;
-
-use crate::database::*;
 
 pub enum MenuAction {
   Exit,
@@ -24,18 +21,16 @@ pub struct Menu {
 }
 
 impl Menu {
-  pub fn start(&mut self, db_type: DataBaseType) -> bool {
-    let mut db = db_factory(db_type);
-
+  pub fn start(&mut self, db: &mut dyn Database) -> bool {
     loop {
-      match self.render(db.as_mut()) {
+      match self.render(db) {
         MenuAction::Exit => return true,
         MenuAction::Close => return false,
         MenuAction::Render => {},
         MenuAction::RenderLoginMenu(card_number) => {
           let mut login_menu = LoginMenu::new(card_number);
 
-          let exit = login_menu.start(db_type);
+          let exit = login_menu.start(db);
 
           if exit {
             return  true;
@@ -68,7 +63,7 @@ impl Menu {
   }
 }
 
-fn print_separator() {
+pub fn print_separator() {
   println!("------------------------------------------");
 }
 
@@ -78,4 +73,3 @@ fn unknown_command() -> MenuAction {
 
   MenuAction::Render
 }
-

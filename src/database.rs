@@ -3,7 +3,6 @@ pub mod sqlite;
 
 use serde::{Deserialize, Serialize};
 use error_stack::{Context, Result};
-use clap::ValueEnum;
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -54,19 +53,6 @@ pub trait Database {
   fn add_funds(&mut self, funds: u32, card_number: &str) -> DatabaseResult<()>;
   fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> DatabaseResult<()>;
   fn get_clients_count(&self) -> u32; // TODO remove, used only in tests
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum DataBaseType {
-  JSON,
-  SQLITE,
-}
-
-pub fn db_factory(database: DataBaseType) -> Box<dyn Database> {
-  match database {
-    DataBaseType::JSON => Box::new(JsonDb::new()),
-    DataBaseType::SQLITE => Box::new(SQLiteDb::new()),
-  }
 }
 
 #[allow(dead_code)]
