@@ -1,10 +1,10 @@
 mod database;
 mod menu;
 
+use clap::Parser;
+
 use database::*;
 use menu::MainMenu;
-
-use clap::{Parser, ValueEnum};
 
 // Simple program to benchmark sort algorithms
 #[derive(Parser)]
@@ -15,23 +15,9 @@ struct Cli {
   database: DataBaseType,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum DataBaseType {
-  JSON,
-  SQLITE,
-}
-
 fn main() {
   let Cli { database } = Cli::parse();
-  let mut db = db_factory(database);
   let mut main_menu = MainMenu::new();
 
-  main_menu.start(db.as_mut());
-}
-
-fn db_factory(database: DataBaseType) -> Box<dyn Database> {
-  match database {
-    DataBaseType::JSON => Box::new(JsonDb::new()),
-    DataBaseType::SQLITE => Box::new(SQLiteDb::new()),
-  }
+  main_menu.start(database);
 }
