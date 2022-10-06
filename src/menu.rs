@@ -1,9 +1,7 @@
 mod cmd;
-mod main_menu;
-mod login_menu;
 
-pub use main_menu::MainMenu;
-pub use login_menu::LoginMenu;
+use crate::menu::cmd::*;
+
 pub use cmd::Cmd;
 
 use crate::Database;
@@ -21,6 +19,31 @@ pub struct Menu {
 }
 
 impl Menu {
+  pub fn new() -> Self {
+    Menu {
+      header: String::from("Main menu"),
+      commands: vec![
+        CreateAccountCmd::new().into(),
+        LoginCmd::new().into(),
+        ExitCmd::new().into(),
+      ],
+    }
+  }
+
+  fn new_login_menu(card_number: String) -> Self {
+    Menu {
+      header: String::from("Login menu"),
+      commands: vec![
+        BalanceCmd::new(card_number.clone()).into(),
+        AddIncomeCmd::new(card_number.clone()).into(),
+        DoTransferCmd::new(card_number.clone()).into(),
+        CloseAccountCmd::new(card_number.clone()).into(),
+        CloseCmd::new().into(),
+        ExitCmd::new().into(),
+      ]
+    }
+  }
+
   pub fn start(&mut self, db: &mut dyn Database) -> bool {
     loop {
       match self.render(db) {
@@ -28,7 +51,7 @@ impl Menu {
         MenuAction::Close => return false,
         MenuAction::Render => {},
         MenuAction::RenderLoginMenu(card_number) => {
-          let mut login_menu = LoginMenu::new(card_number);
+          let mut login_menu = Menu::new_login_menu(card_number);
 
           let exit = login_menu.start(db);
 
@@ -63,10 +86,11 @@ impl Menu {
   }
 }
 
-pub fn print_separator() {
+fn print_separator() {
   println!("------------------------------------------");
 }
 
+// make as new menu action ?
 fn unknown_command() -> MenuAction {
   print_separator();
   println!("|Unknown command|");

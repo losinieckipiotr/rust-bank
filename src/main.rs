@@ -2,7 +2,7 @@ mod database;
 mod menu;
 
 use database::*;
-use menu::MainMenu;
+use menu::Menu;
 
 use clap::{Parser, ValueEnum};
 
@@ -24,7 +24,7 @@ enum DataBaseType {
 fn main() {
   let Cli { database } = Cli::parse();
   let mut db = db_factory(database);
-  let mut main_menu = MainMenu::new();
+  let mut main_menu = Menu::new();
 
   main_menu.start(db.as_mut());
 }
