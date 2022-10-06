@@ -12,8 +12,6 @@ use std::fmt;
 
 pub type SQLiteDataBaseResult<T> = Result<T, SQLiteDatabaseError>;
 
-// TODO error handling
-
 #[derive(Debug)]
 pub enum SQLiteDatabaseError {
   QueryFailed,
