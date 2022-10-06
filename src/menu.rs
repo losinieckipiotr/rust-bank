@@ -30,14 +30,14 @@ impl Menu {
     }
   }
 
-  fn new_login_menu(card_number: String) -> Self {
+  fn new_login_menu(card_number: &str) -> Self {
     Menu {
       header: String::from("Login menu"),
       commands: vec![
-        BalanceCmd::new(card_number.clone()).into(),
-        AddIncomeCmd::new(card_number.clone()).into(),
-        DoTransferCmd::new(card_number.clone()).into(),
-        CloseAccountCmd::new(card_number.clone()).into(),
+        BalanceCmd::new(card_number).into(),
+        AddIncomeCmd::new(card_number).into(),
+        DoTransferCmd::new(card_number).into(),
+        CloseAccountCmd::new(card_number).into(),
         CloseCmd::new().into(),
         ExitCmd::new().into(),
       ]
@@ -51,7 +51,7 @@ impl Menu {
         MenuAction::Close => return false,
         MenuAction::Render => {},
         MenuAction::RenderLoginMenu(card_number) => {
-          let mut login_menu = Menu::new_login_menu(card_number);
+          let mut login_menu = Menu::new_login_menu(&card_number);
 
           let exit = login_menu.start(db);
 

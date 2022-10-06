@@ -24,9 +24,9 @@ pub struct  AddIncomeCmd {
 }
 
 impl AddIncomeCmd {
-  pub fn new(card_number: String) -> Self {
+  pub fn new(card_number: &str) -> Self {
     AddIncomeCmd {
-      card_number,
+      card_number: card_number.to_owned(),
       read_from_cmd: Box::new(cmd_impl::read),
     }
   }

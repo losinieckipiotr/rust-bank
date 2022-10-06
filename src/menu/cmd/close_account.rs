@@ -6,9 +6,9 @@ pub struct CloseAccountCmd {
 }
 
 impl CloseAccountCmd {
-  pub fn new(card_number: String) -> Self {
+  pub fn new(card_number: &str) -> Self {
     CloseAccountCmd {
-      card_number
+      card_number: card_number.to_owned(),
     }
   }
 }
@@ -59,7 +59,7 @@ mod tests {
 
     assert_eq!(db.get_clients_count(), 1);
 
-    let close_account_cmd = CloseAccountCmd::new(card_number);
+    let close_account_cmd = CloseAccountCmd::new(&card_number);
 
     let menu_action = close_account_cmd.exec(&mut db);
 

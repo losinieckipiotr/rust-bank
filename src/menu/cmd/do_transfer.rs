@@ -27,9 +27,9 @@ const RECEIVER_CARD_PROMPT: &str = "Enter receiver card number:";
 const AMOUNT_PROMPT: &str = "Enter amount:";
 
 impl DoTransferCmd {
-  pub fn new(card_number: String) -> Self {
+  pub fn new(card_number: &str) -> Self {
     DoTransferCmd {
-      card_number,
+      card_number: card_number.to_owned(),
       read_from_cmd: Box::new(cmd_impl::read),
     }
   }

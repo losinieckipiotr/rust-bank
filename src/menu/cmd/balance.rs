@@ -6,9 +6,9 @@ pub struct  BalanceCmd {
 }
 
 impl BalanceCmd {
-  pub fn new(card_number: String) -> Self {
+  pub fn new(card_number: &str) -> Self {
     BalanceCmd {
-      card_number,
+      card_number: card_number.to_owned(),
     }
   }
 }
@@ -49,7 +49,7 @@ mod tests {
 
   fn exec_balance_cmd(mut db: impl Database) {
     let mock_client = crate::database::tests::get_mock_client();
-    let balance_cmd = BalanceCmd::new(mock_client.card_number.clone());
+    let balance_cmd = BalanceCmd::new(&mock_client.card_number);
     db.save_new_client(mock_client).unwrap();
 
     let menu_action = balance_cmd.exec(&mut db);
