@@ -300,4 +300,3 @@ pub mod tests {
     rusqlite::Connection::open_in_memory().unwrap()
   }
 }
-

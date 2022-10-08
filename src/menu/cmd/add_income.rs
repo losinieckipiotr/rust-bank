@@ -133,4 +133,3 @@ mod tests {
     assert_eq!(client.balance.to_string(), "1000")
   }
 }
-
