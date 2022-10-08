@@ -26,6 +26,7 @@ pub enum MenuAction {
   Close,
   Render,
   RenderLoginMenu(String),
+  UnknownCommand
 }
 
 pub struct Menu {
@@ -43,7 +44,7 @@ impl Menu {
         LoginCmd::new().into(),
         ExitCmd::new().into(),
       ],
-      read_from_cmd: Box::new(menu_prompt_impl),
+      read_from_cmd: Box::new(Menu::prompt_impl),
     }
   }
 
@@ -58,7 +59,7 @@ impl Menu {
         CloseCmd::new().into(),
         ExitCmd::new().into(),
       ],
-      read_from_cmd: Box::new(menu_prompt_impl),
+      read_from_cmd: Box::new(Menu::prompt_impl),
     }
   }
 
@@ -76,13 +77,17 @@ impl Menu {
           if exit {
             return  true;
           }
+        },
+        MenuAction::UnknownCommand => {
+          Menu::print_separator();
+          println!("|Unknown command|");
         }
       }
     }
   }
 
   fn render(&mut self, db: &mut dyn Database) -> MenuAction {
-    print_separator();
+    Menu::print_separator();
     println!("{}:", self.header);
 
     for (i, cmd) in self.commands.iter().enumerate() {
@@ -101,31 +106,23 @@ impl Menu {
 
     let number = match i32::from_str_radix(&line, 10) {
       Ok(n) => n,
-      _ => return unknown_command(),
+      _ => return MenuAction::UnknownCommand,
     };
 
     match self.commands.get(number as usize) {
       Some(cmd) =>  cmd.exec(db),
-      None => unknown_command(),
+      None => MenuAction::UnknownCommand,
     }
   }
-}
 
-fn menu_prompt_impl() -> MenuResult<String> {
-  read_from_cmd()
-    .change_context(MenuError)
-}
+  fn prompt_impl() -> MenuResult<String> {
+    read_from_cmd()
+      .change_context(MenuError)
+  }
 
-fn print_separator() {
-  println!("------------------------------------------");
-}
-
-// TODO make as new menu action ?
-fn unknown_command() -> MenuAction {
-  print_separator();
-  println!("|Unknown command|");
-
-  MenuAction::Render
+  fn print_separator() {
+    println!("------------------------------------------");
+  }
 }
 
 #[cfg(test)]
