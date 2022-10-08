@@ -136,6 +136,8 @@ mod tests {
     use super::*;
     use crate::database::json::tests::get_mock_db;
 
+    // TODO make a macro ?
+
     #[test]
     fn should_exit_with_true_json() {
       exit_with_true(get_mock_db());
