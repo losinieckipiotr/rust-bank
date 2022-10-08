@@ -20,7 +20,7 @@ impl Cmd for CreateAccountCmd {
   }
 
   fn exec(&self, db: &mut dyn Database) -> MenuAction {
-    let mut card_number = String::new();
+    let mut card_number;
     loop {
       card_number = generate_card_number();
 
