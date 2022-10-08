@@ -1,6 +1,7 @@
 mod database;
 mod menu;
 mod cmd;
+mod luhn;
 
 use database::*;
 use menu::Menu;

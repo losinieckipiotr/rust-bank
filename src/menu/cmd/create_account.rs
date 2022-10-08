@@ -1,5 +1,6 @@
 use crate::menu::{MenuAction, Cmd};
 use crate::database::{Database, Client};
+use crate::luhn::is_valid_card_number;
 
 use rand::prelude::{thread_rng, IteratorRandom};
 
@@ -60,16 +61,18 @@ impl Cmd for CreateAccountCmd {
 }
 
 fn generate_card_number() -> String {
-  // TODO proper Lunh algorithm to generate card numbers
-  let mut card_number = String::from("400000");
+  loop {
+    let mut card_number = String::from("400000");
     let digits =  DIGITS;
     let mut rng = thread_rng();
     for _ in 0..10 {
       let num = digits.chars().choose(&mut rng).unwrap();
       card_number.push(num);
     }
-
-    card_number
+    if is_valid_card_number(&card_number) {
+      return card_number
+    }
+  }
 }
 
 fn generate_pin() -> String {
