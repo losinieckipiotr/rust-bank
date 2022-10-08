@@ -60,6 +60,7 @@ impl Cmd for CreateAccountCmd {
 }
 
 fn generate_card_number() -> String {
+  // TODO proper Lunh algorithm to generate card numbers
   let mut card_number = String::from("400000");
     let digits =  DIGITS;
     let mut rng = thread_rng();

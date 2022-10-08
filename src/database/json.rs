@@ -326,10 +326,10 @@ pub mod tests {
   use super::*;
 
   pub fn get_mock_db() -> JsonDb {
-    use std::cell::RefCell;
     use std::rc::Rc;
+    use std::cell::RefCell;
 
-    // Rc is shared pointer (clears memory when no longer in use)
+    // Rc is shared pointer (readonly, clears memory when no longer in use)
     // RefCell is shared memory at runtime (ensures only one mutable reference at once)
     // now I can share state between mock functions
     let data = Rc::new(

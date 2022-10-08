@@ -1,5 +1,6 @@
 use crate::menu::{MenuAction, Cmd};
 use crate::Database;
+use crate::cmd::read_with_prompt;
 
 use error_stack::{Context, IntoReport, Result, ResultExt};
 
@@ -30,7 +31,10 @@ impl DoTransferCmd {
   pub fn new(card_number: &str) -> Self {
     DoTransferCmd {
       card_number: card_number.to_owned(),
-      read_from_cmd: Box::new(cmd_impl::read),
+      read_from_cmd: Box::new(|prompt: &str| {
+        read_with_prompt(prompt)
+          .change_context(DoTransferError)
+      }),
     }
   }
 
@@ -78,24 +82,6 @@ impl Cmd for DoTransferCmd {
     }
 
     MenuAction::Render
-  }
-}
-
-mod cmd_impl {
-  use super::*;
-
-  pub fn read(prompt: &str) -> DoTransferResult<String> {
-    println!("{}", prompt);
-
-    let mut buf = String::new();
-    std::io::stdin().read_line(&mut buf)
-    .report()
-    .attach_printable(format!("{prompt}"))
-    .change_context(DoTransferError)?;
-
-    let login = buf.trim_end();
-
-    Ok(String::from(login))
   }
 }
 

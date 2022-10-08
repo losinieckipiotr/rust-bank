@@ -1,8 +1,9 @@
-use crate::menu::Cmd;
-use crate::{Database, Client};
-use crate::menu::MenuAction;
+use crate::menu::{MenuAction, Cmd};
+use crate::Database;
+use crate::cmd::read_with_prompt;
+use crate::Client;
 
-use error_stack::{Context, IntoReport, Report, Result, ResultExt};
+use error_stack::{Context, Report, Result, ResultExt};
 
 use std::fmt;
 
@@ -34,7 +35,10 @@ pub struct  LoginCmd {
 impl LoginCmd {
   pub fn new() -> Self {
     LoginCmd {
-      read_from_cmd: Box::new(cmd_impl::read),
+      read_from_cmd: Box::new(|prompt: &str| {
+        read_with_prompt(prompt)
+          .change_context(LoginError::ReadFromConsoleFailed)
+      }),
     }
   }
 
@@ -95,24 +99,6 @@ impl Cmd for LoginCmd {
 
 fn print_report(error: Report<LoginError>) {
   println!("\nlogin failed: {error:?}");
-}
-
-mod cmd_impl {
-  use super::*;
-
-  pub fn read(prompt: &str) -> LoginResult<String> {
-    println!("{}", prompt);
-
-    let mut buf = String::new();
-    std::io::stdin().read_line(&mut buf)
-    .report()
-    .attach_printable(format!("{prompt}"))
-    .change_context(LoginError::ReadFromConsoleFailed)?;
-
-    let login = buf.trim_end();
-
-    Ok(String::from(login))
-  }
 }
 
 #[cfg(test)]
