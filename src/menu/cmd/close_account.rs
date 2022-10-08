@@ -50,14 +50,14 @@ mod tests {
   }
 
   fn exec_create_account_cmd(mut db: impl Database) {
-    assert_eq!(db.get_clients_count(), 0);
+    assert_eq!(db.get_clients_count().unwrap(), 0);
 
     let mock_client = crate::database::tests::get_mock_client();
     let card_number = mock_client.card_number.clone();
 
     db.save_new_client(mock_client).unwrap();
 
-    assert_eq!(db.get_clients_count(), 1);
+    assert_eq!(db.get_clients_count().unwrap(), 1);
 
     let close_account_cmd = CloseAccountCmd::new(&card_number);
 
@@ -65,6 +65,6 @@ mod tests {
 
     let matches = matches!(menu_action, MenuAction::Close);
     assert_eq!(matches, true);
-    assert_eq!(db.get_clients_count(), 0);
+    assert_eq!(db.get_clients_count().unwrap(), 0);
   }
 }

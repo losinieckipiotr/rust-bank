@@ -102,12 +102,12 @@ mod tests {
   fn exec_create_account_cmd(mut db: impl Database) {
     let create_account_cmd = CreateAccountCmd::new();
 
-    assert_eq!(db.get_clients_count(), 0);
+    assert_eq!(db.get_clients_count().unwrap(), 0);
 
     let menu_action = create_account_cmd.exec(&mut db);
 
     let matches = matches!(menu_action, MenuAction::Render);
     assert_eq!(matches, true);
-    assert_eq!(db.get_clients_count(), 1);
+    assert_eq!(db.get_clients_count().unwrap(), 1);
   }
 }

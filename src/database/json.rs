@@ -1,11 +1,12 @@
 use crate::Database;
 use crate::Client;
 use crate::{DatabaseError, DatabaseResult};
-use crate::DatabaseData;
 
+use serde::{Deserialize, Serialize};
 use error_stack::{Context, Result, IntoReport, Report, ResultExt};
 
 use std::fmt;
+use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub enum JsonDatabaseError {
@@ -15,6 +16,7 @@ pub enum JsonDatabaseError {
   ReadingDatabaseFile,
   ClientNotFound,
   InsufficientFunds,
+  ClientAlreadyInDatabase(String)
 }
 
 impl fmt::Display for JsonDatabaseError {
@@ -25,7 +27,8 @@ impl fmt::Display for JsonDatabaseError {
       JsonDatabaseError::ReadingDatabaseFile => write!(f, "reading database file failed"),
       JsonDatabaseError::SavingDatabaseFile => write!(f, "saving database file failed"),
       JsonDatabaseError::ClientNotFound => write!(f, "client not found in database"),
-      JsonDatabaseError::InsufficientFunds => write!(f, "operation failed due to insufficient funds")
+      JsonDatabaseError::InsufficientFunds => write!(f, "operation failed due to insufficient funds"),
+      JsonDatabaseError::ClientAlreadyInDatabase(card_number) => write!(f, "client with {card_number} already exists in database")
     }
   }
 }
@@ -34,16 +37,25 @@ impl Context for JsonDatabaseError {}
 
 pub type JsonDataBaseResult<T> = Result<T, JsonDatabaseError>;
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct DatabaseData {
+  pub clients: BTreeMap<String, Client>,
+}
+
+impl DatabaseData {
+  pub fn new() -> Self {
+    DatabaseData { clients: BTreeMap::new() }
+  }
+}
+
 pub struct JsonDb {
-  data: DatabaseData, // TODO do not store data in RAM
   read_json_file: Box<dyn Fn() -> JsonDataBaseResult<String>>,
   write_json_to_file: Box<dyn Fn(&str) -> JsonDataBaseResult<()>>,
 }
 
 impl JsonDb {
   pub fn new() -> Self {
-    let mut db = JsonDb {
-      data: DatabaseData::new(),
+    let db = JsonDb {
       read_json_file: Box::new(fs_impl::read_json_file),
       write_json_to_file: Box::new(fs_impl::write_json_to_file),
     };
@@ -56,33 +68,32 @@ impl JsonDb {
     db
   }
 
-  fn read_data(&mut self) -> JsonDataBaseResult<()> {
+  fn read_data(&self) -> JsonDataBaseResult<DatabaseData> {
     let read_json_file = self.read_json_file.as_ref();
 
-    match read_json_file() {
+    let data = match read_json_file() {
       Err(e) => {
         println!("try to create new database file because: {:?}", e);
 
-        // self.data must be empty
-        assert_eq!(self.data,  DatabaseData::new());
+        let data = DatabaseData::new();
 
-        self.save_data()
+        self.save_data(&data)
           .attach_printable("creating new database file failed")?;
+
+        data
       },
       Ok(str) => {
-        let red_data = json_impl::data_from_json(&str)?;
-        // sync data
-        self.data = red_data;
+        json_impl::data_from_json(&str)?
       }
     };
 
-    Ok(())
+    Ok(data)
   }
 
-  fn save_data(&self) -> JsonDataBaseResult<()> {
+  fn save_data(&self, data: &DatabaseData) -> JsonDataBaseResult<()> {
     let write_json_to_file = self.write_json_to_file.as_ref();
 
-    let json = json_impl::data_to_json_str(&self.data)?;
+    let json = json_impl::data_to_json_str(data)?;
 
     write_json_to_file(&json)
       .attach_printable_lazy(|| {
@@ -93,21 +104,20 @@ impl JsonDb {
   }
 
   fn save_clients(&mut self, clients: &[Client]) -> DatabaseResult<()> {
-    // make copy to rollback changes in case of error
-    let data_copy = self.data.clone();
+    let mut data = self.read_data()
+      .attach_printable_lazy(|| {
+        format!("failed to read data from json, before clients save")
+      })
+      .change_context(DatabaseError::JSON)?;
+
 
     for client in clients {
-      self.data.clients.insert(client.card_number.clone(), client.clone());
+      data.clients.insert(client.card_number.clone(), client.clone());
     }
 
-    self.save_data()
+    self.save_data(&data)
       .attach_printable_lazy(|| {
         format!("failed to save {} clients: {:?}", clients.len(), clients)
-      })
-      .or_else(|err| {
-        // rollback
-        self.data = data_copy;
-        Err(err)
       })
       .change_context(DatabaseError::JSON)?;
 
@@ -121,13 +131,26 @@ impl Database for JsonDb {
   }
 
   fn save_new_client(&mut self, client: Client) -> DatabaseResult<()> {
-    // TODO check if already exists
-    self.data.clients.insert(
+    let mut data = self.read_data()
+      .attach_printable_lazy(|| {
+        format!("failed to read data from json, before new client save")
+      })
+      .change_context(DatabaseError::JSON)?;
+
+    if data.clients.contains_key(&client.card_number) {
+      return Err(
+        Report::new(
+          JsonDatabaseError::ClientAlreadyInDatabase(client.card_number)
+        )
+      ).change_context(DatabaseError::JSON)
+    }
+
+    data.clients.insert(
       client.card_number.clone(),
       client.clone()
     );
 
-    self.save_data()
+    self.save_data(&data)
       .attach_printable_lazy(|| {
         format!("failed insert new client, client: {:?}", client)
       })
@@ -137,11 +160,17 @@ impl Database for JsonDb {
   }
 
   fn has_client(&self, card_number: &str) -> DatabaseResult<bool> {
-    Ok(self.data.clients.contains_key(card_number))
+    let data = self.read_data()
+      .change_context(DatabaseError::JSON)?;
+
+    Ok(data.clients.contains_key(card_number))
   }
 
   fn get_client(&self, card_number: &str) -> DatabaseResult<Client> {
-    match self.data.clients.get(card_number) {
+    let data = self.read_data()
+      .change_context(DatabaseError::JSON)?;
+
+    match data.clients.get(card_number) {
       None => Err(Report::new(JsonDatabaseError::ClientNotFound))
         .attach_printable_lazy(|| {
           format!("client with card_number: {} not found", card_number)
@@ -152,7 +181,10 @@ impl Database for JsonDb {
   }
 
   fn remove_client(&mut self, card_number: &str) -> DatabaseResult<Client> {
-    let client = match self.data.clients.remove(card_number) {
+    let mut data = self.read_data()
+      .change_context(DatabaseError::JSON)?;
+
+    let client = match data.clients.remove(card_number) {
       None => Err(Report::new(JsonDatabaseError::ClientNotFound))
         .attach_printable_lazy(|| {
           format!("client with card_number: {} is not present in database", card_number)
@@ -161,7 +193,11 @@ impl Database for JsonDb {
       Some(client) => Ok(client)
     };
 
-    self.save_data().change_context(DatabaseError::JSON)?;
+    self.save_data(&data)
+      .attach_printable_lazy(|| {
+        format!("failed to remove client because save_data error")
+      })
+      .change_context(DatabaseError::JSON)?;
 
     client
   }
@@ -214,8 +250,11 @@ impl Database for JsonDb {
     Ok(())
   }
 
-  fn get_clients_count(&self) -> u32 {
-    self.data.clients.len() as u32
+  fn get_clients_count(&self) -> DatabaseResult<u32> {
+    let data = self.read_data()
+      .change_context(DatabaseError::JSON)?;
+
+    Ok(data.clients.len() as u32)
   }
 }
 
@@ -287,15 +326,36 @@ pub mod tests {
   use super::*;
 
   pub fn get_mock_db() -> JsonDb {
-    let mut json_db = JsonDb {
-      data: DatabaseData::new(),
-      read_json_file: get_empty_data_mock(),
-      write_json_to_file: write_success_mock(),
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    // Rc is shared pointer (clears memory when no longer in use)
+    // RefCell is shared memory at runtime (ensures only one mutable reference at once)
+    // now I can share state between mock functions
+    let data = Rc::new(
+      RefCell::new(
+        String::from("{\"clients\":{}}")
+      )
+    );
+    let data_copy = data.clone();
+
+    let json_db = JsonDb {
+      read_json_file: Box::new(move || {
+        Ok(data.borrow().clone())
+      }),
+      write_json_to_file: Box::new(move |json| {
+        let mut saved_json = data_copy.borrow_mut();
+
+        saved_json.clear();
+        saved_json.push_str(json);
+
+        Ok(())
+      }),
     };
 
-    let result = json_db.read_data();
-    let read_ok = matches!(result, Ok(()));
-    assert_eq!(read_ok, true);
+    let data = json_db.read_data().unwrap();
+
+    assert_eq!(data, DatabaseData::new());
 
     json_db
   }
@@ -322,18 +382,5 @@ pub mod tests {
     });
 
     json_db.save_new_client(client_mock).unwrap();
-  }
-
-  fn get_empty_data_mock() -> Box<dyn Fn() -> JsonDataBaseResult<String>> {
-    Box::new(|| Ok(String::from("{\"clients\":{}}")))
-  }
-
-  fn write_success_mock() -> Box<dyn Fn(&str) -> JsonDataBaseResult<()>> {
-    Box::new(|_| {
-      // Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permissions error test"))
-      // .report()
-      // .change_context(JsonDatabaseError::SavingDatabaseFile)
-      Ok(())
-    })
   }
 }

@@ -18,6 +18,8 @@ pub struct Menu {
   commands: Vec<Box<dyn Cmd>>,
 }
 
+// TODO tests
+
 impl Menu {
   pub fn new() -> Self {
     Menu {

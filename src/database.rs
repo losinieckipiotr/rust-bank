@@ -4,9 +4,6 @@ pub mod sqlite;
 use serde::{Deserialize, Serialize};
 use error_stack::{Context, Result};
 
-use std::collections::BTreeMap;
-use std::fmt;
-
 pub use sqlite::*;
 pub use json::*;
 
@@ -17,24 +14,13 @@ pub struct Client {
   pub balance: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct DatabaseData {
-  pub clients: BTreeMap<String, Client>,
-}
-
-impl DatabaseData {
-  pub fn new() -> Self {
-    DatabaseData { clients: BTreeMap::new() }
-  }
-}
-
 #[derive(Debug)]
 pub enum DatabaseError {
   JSON,
   SQLite,
 }
 
-impl fmt::Display for DatabaseError {
+impl std::fmt::Display for DatabaseError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "database operation failed")
   }
@@ -52,7 +38,7 @@ pub trait Database {
   fn remove_client(&mut self, card_number: &str) -> DatabaseResult<Client>;
   fn add_funds(&mut self, funds: u32, card_number: &str) -> DatabaseResult<()>;
   fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> DatabaseResult<()>;
-  fn get_clients_count(&self) -> u32; // TODO remove, used only in tests
+  fn get_clients_count(&self) -> DatabaseResult<u32>; // TODO remove, used only in tests
 }
 
 #[allow(dead_code)]

@@ -251,7 +251,7 @@ impl Database for SQLiteDb {
     Ok(())
   }
 
-  fn get_clients_count(&self) -> u32 {
+  fn get_clients_count(&self) -> DatabaseResult<u32> {
     let count: u32 = self.connection.prepare(
       "
         SELECT COUNT(*)
@@ -262,7 +262,7 @@ impl Database for SQLiteDb {
     .query_row([], |row| { row.get(0) })
     .unwrap();
 
-    count
+    Ok(count)
   }
 }
 
@@ -285,11 +285,11 @@ pub mod tests {
     let client_mock = crate::database::tests::get_mock_client();
     let mut sql_db = get_mock_db();
 
-    assert_eq!(sql_db.get_clients_count(), 0);
+    assert_eq!(sql_db.get_clients_count().unwrap(), 0);
 
     sql_db.save_new_client(client_mock.clone()).unwrap();
 
-    assert_eq!(sql_db.get_clients_count(), 1);
+    assert_eq!(sql_db.get_clients_count().unwrap(), 1);
     assert_eq!(
       client_mock,
       sql_db.get_client(&client_mock.card_number.clone()).unwrap()
