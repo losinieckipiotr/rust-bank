@@ -1,7 +1,6 @@
 use crate::Database;
 use crate::Client;
 use crate::DatabaseResult;
-// use crate::DatabaseData;
 use crate::DatabaseError;
 
 use rusqlite::params;
