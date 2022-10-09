@@ -65,7 +65,7 @@ fn generate_card_number() -> String {
     let digits =  DIGITS;
     let mut rng = thread_rng();
     for _ in 0..10 {
-      let num = digits.chars().choose(&mut rng).unwrap();
+      let num = digits.chars().choose(&mut rng).unwrap(); // FIXME
       card_number.push(num);
     }
     if is_valid_card_number(&card_number) {
@@ -80,7 +80,7 @@ fn generate_pin() -> String {
   let mut rng = thread_rng();
 
   for _ in 0..4 {
-    let num = digits.chars().choose(&mut rng).unwrap();
+    let num = digits.chars().choose(&mut rng).unwrap(); // FIXME
     pin.push(num);
   }
 

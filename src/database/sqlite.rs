@@ -13,6 +13,7 @@ pub type SQLiteDataBaseResult<T> = Result<T, SQLiteDatabaseError>;
 
 #[derive(Debug)]
 pub enum SQLiteDatabaseError {
+  ConnectionFailed,
   QueryFailed,
   PrepareQueryFailed,
   ClientAlreadyExists(Client),
@@ -21,6 +22,7 @@ pub enum SQLiteDatabaseError {
 impl fmt::Display for SQLiteDatabaseError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
     match self {
+      Self::ConnectionFailed => write!(f, "getting sqlite connection failed"),
       Self::QueryFailed => write!(f, "sqlite query failed"),
       Self::PrepareQueryFailed => write!(f, "prepare sqlite query failed"),
       Self::ClientAlreadyExists(client) => write!(f, "client already exists in database, {client:?}"),
@@ -34,18 +36,28 @@ pub struct SQLiteDb {
   connection: rusqlite::Connection,
 }
 
-fn get_connection_impl() -> rusqlite::Connection {
-  rusqlite::Connection::open("clients.db").unwrap()
+fn get_connection_impl() -> SQLiteDataBaseResult<rusqlite::Connection> {
+  rusqlite::Connection::open("clients.db")
+    .report()
+    .change_context(SQLiteDatabaseError::ConnectionFailed)
 }
 
 impl SQLiteDb {
   pub fn new() -> Self {
+    let connection = match get_connection_impl() {
+      Err(error) => {
+        println!("\nerror: {:?}", error);
+        panic!("SQLiteDb::new() failed");
+      },
+      Ok(conn) => conn,
+    };
+
     let db = SQLiteDb {
-      connection: get_connection_impl()
+      connection
     };
 
     if let Err(error) = db.create_clients_table() {
-      println!("\n failed to create clients table, error: {:?}", error);
+      println!("\nfailed to create clients table, error: {:?}", error);
       panic!("SQLiteDb::new() failed");
     }
 
@@ -86,16 +98,16 @@ impl SQLiteDb {
         client.balance
       ]
     )
-    .report()
-    .attach_printable_lazy(|| {
-      format!("failed to execute INSERT query for {client:?}")
-    })
-    .change_context(SQLiteDatabaseError::QueryFailed)?;
+      .report()
+      .attach_printable_lazy(|| {
+        format!("failed to execute INSERT query for {client:?}")
+      })
+      .change_context(SQLiteDatabaseError::QueryFailed)?;
 
     Ok(())
   }
 
-  fn update_client_balance(client: &Client, conn: &rusqlite::Connection) {
+  fn update_client_balance(client: &Client, conn: &rusqlite::Connection) -> SQLiteDataBaseResult<()> {
     conn.execute(
       "
         UPDATE clients
@@ -106,7 +118,18 @@ impl SQLiteDb {
         client.balance,
         client.card_number
       ]
-    ).unwrap();
+    )
+      .report()
+      .attach_printable_lazy(|| {
+        format!(
+          "failed to update client balance card_number: {}, balance: {}",
+          client.card_number,
+          client.balance
+        )
+      })
+      .change_context(SQLiteDatabaseError::QueryFailed)?;
+
+    Ok(())
   }
 }
 
@@ -144,6 +167,12 @@ impl Database for SQLiteDb {
       "
     )
       .report()
+      .attach_printable_lazy(|| {
+        format!(
+          "failed to prepare select client query with card_number: {}",
+          card_number
+        )
+      })
       .change_context(SQLiteDatabaseError::PrepareQueryFailed)
       .change_context(DatabaseError::SQLite)?;
 
@@ -169,18 +198,39 @@ impl Database for SQLiteDb {
         FROM clients
         WHERE cardNumber = ?
       "
-    ).unwrap();
-    Ok(stmt.query_row([&card_number], |row| {
+    )
+      .report()
+      .attach_printable_lazy(|| {
+        format!(
+          "failed to prepare select client query with card_number: {}",
+          card_number
+        )
+      })
+      .change_context(SQLiteDatabaseError::PrepareQueryFailed)
+      .change_context(DatabaseError::SQLite)?;
+
+    let client: Client = stmt.query_row([&card_number], |row| {
       Ok(Client {
         card_number: row.get(0)?,
         pin: row.get(1)?,
         balance: row.get(2)?
       })
-    }).unwrap())
+    })
+      .report()
+      .attach_printable_lazy(|| {
+        format!(
+          "failed to get client with card_number: {} from database",
+          card_number
+        )
+      })
+      .change_context(SQLiteDatabaseError::QueryFailed)
+      .change_context(DatabaseError::SQLite)?;
+
+    Ok(client)
   }
 
   fn remove_client(&mut self, card_number: &str) -> DatabaseResult<Client> {
-    let client = self.get_client(card_number).unwrap();
+    let client = self.get_client(card_number)?;
 
     self.connection.execute(
       "
@@ -188,7 +238,16 @@ impl Database for SQLiteDb {
         WHERE cardNumber = ?
       ",
       [&card_number]
-    ).unwrap();
+    )
+      .report()
+      .attach_printable_lazy(|| {
+        format!(
+          "failed to delete client with card_number: {} from database",
+          card_number
+        )
+      })
+      .change_context(SQLiteDatabaseError::QueryFailed)
+      .change_context(DatabaseError::SQLite)?;
 
     Ok(client)
   }
@@ -208,20 +267,39 @@ impl Database for SQLiteDb {
         client.balance,
         client.card_number,
       ]
-    ).unwrap();
+    )
+      .report()
+      .attach_printable_lazy(|| {
+        format!(
+          "failed to update client balance, client card_number: {}",
+          card_number
+        )
+      })
+      .change_context(SQLiteDatabaseError::QueryFailed)
+      .change_context(DatabaseError::SQLite)?;
 
     Ok(())
   }
 
-  fn transfer_funds(&mut self, funds: u32, sender_card_number: &str, receiver_card_number: &str) -> DatabaseResult<()> {
+  fn transfer_funds(
+    &mut self, funds: u32,
+    sender_card_number: &str,
+    receiver_card_number: &str
+  ) -> DatabaseResult<()> {
     let mut sender_client = self.get_client(sender_card_number)
       .attach_printable_lazy(|| {
-        format!("sender client not found, sender_card_number: {}", sender_card_number)
+        format!(
+          "sender client not found, sender_card_number: {}",
+          sender_card_number
+        )
       })?;
 
     let mut receiver_client = self.get_client(receiver_card_number)
       .attach_printable_lazy(|| {
-        format!("receiver client not found, receiver_card_number: {}", receiver_card_number)
+        format!(
+          "receiver client not found, receiver_card_number: {}",
+          receiver_card_number
+        )
       })?;
 
     let sender_original_balance = sender_client.balance;
@@ -240,26 +318,57 @@ impl Database for SQLiteDb {
 
     receiver_client.balance += funds as i32;
 
-    let tx = self.connection.transaction().unwrap();
+    let transaction = self.connection.transaction()
+      .report()
+      .attach_printable_lazy(|| {
+        format!("failed to create transaction")
+      })
+      .change_context(DatabaseError::SQLite)?;
 
-    SQLiteDb::update_client_balance(&sender_client, &tx);
-    SQLiteDb::update_client_balance(&receiver_client, &tx);
+    SQLiteDb::update_client_balance(&sender_client, &transaction)
+      .attach_printable_lazy(|| {
+        format!("failed to update sender_client in database")
+      })
+      .change_context(DatabaseError::SQLite)?;
 
-    tx.commit().unwrap();
+    SQLiteDb::update_client_balance(&receiver_client, &transaction)
+      .attach_printable_lazy(|| {
+        format!("failed to update receiver_client in database")
+      })
+      .change_context(DatabaseError::SQLite)?;
 
-    Ok(())
+    return match transaction.commit() {
+      Err(error) => Err(error)
+        .report()
+        .attach_printable_lazy(|| {
+          format!("failed to commit transfer transaction")
+        })
+        .change_context(DatabaseError::SQLite),
+      Ok(()) => Ok(())
+    }
   }
 
   fn get_clients_count(&self) -> DatabaseResult<u32> {
-    let count: u32 = self.connection.prepare(
+    let mut stmt = self.connection.prepare(
       "
         SELECT COUNT(*)
         FROM clients
       "
     )
-    .unwrap()
-    .query_row([], |row| { row.get(0) })
-    .unwrap();
+      .report()
+      .attach_printable_lazy(|| {
+        format!("failed to prepare clients count query")
+      })
+      .change_context(SQLiteDatabaseError::PrepareQueryFailed)
+      .change_context(DatabaseError::SQLite)?;
+
+    let count: u32 = stmt.query_row([], |row| { row.get(0) })
+      .report()
+      .attach_printable_lazy(|| {
+        format!("failed to execute clients count query")
+      })
+      .change_context(SQLiteDatabaseError::QueryFailed)
+      .change_context(DatabaseError::SQLite)?;
 
     Ok(count)
   }
