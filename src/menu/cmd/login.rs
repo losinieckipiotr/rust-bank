@@ -1,6 +1,6 @@
 use crate::menu::{MenuAction, Cmd};
 use crate::Database;
-use crate::cmd::read_with_prompt;
+use crate::command_line::read_with_prompt;
 use crate::Client;
 
 use error_stack::{Context, Report, Result, ResultExt};

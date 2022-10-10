@@ -2,7 +2,7 @@ mod cmd;
 
 use crate::menu::cmd::*;
 use crate::Database;
-use crate::cmd::read_from_cmd;
+use crate::command_line::read_from_cmd;
 
 use error_stack::{Context, Result, ResultExt};
 

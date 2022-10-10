@@ -1,6 +1,6 @@
 mod database;
 mod menu;
-mod cmd;
+mod command_line;
 mod luhn;
 
 use database::*;
