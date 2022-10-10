@@ -8,7 +8,7 @@ use menu::Menu;
 
 use clap::{Parser, ValueEnum};
 
-// Simple program to benchmark sort algorithms
+// Simple sort of banking program
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
